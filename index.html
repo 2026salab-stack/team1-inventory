@@ -140,6 +140,9 @@ tr.group td small{font-weight:500;color:var(--muted);margin-left:8px}
 .req-pop h3{margin:0;font:700 15px var(--font-display);display:flex;justify-content:space-between;align-items:center}
 .pop-item{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
 .pop-item.late{background:var(--warn-soft);border-color:var(--warn)}
+.danger-zone{border-color:var(--bad)}
+.danger-zone .sec-title{color:var(--bad)}
+.btn.danger-fill{background:var(--bad);color:var(--on-bad);border-color:var(--bad)}
 .ro-banner{background:var(--warn-soft);color:var(--warn);border-radius:14px;padding:12px 16px;font-size:13px;margin-bottom:16px}
 .ro-banner b{font-weight:700}
 .callout{background:var(--accent-soft);color:var(--accent);border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;margin:0}
@@ -573,6 +576,16 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
           <button class="btn danger" id="clearExamples">예시 데이터 지우기</button>
         </div>
         <p class="note">예시 데이터는 연습용 재고예요. 실제 재고와 섞이지 않게 표시되고, 버튼 한 번으로 지울 수 있어요.</p>
+      </section>
+      <section class="panel card kv danger-zone">
+        <h2 class="sec-title">전체 초기화</h2>
+        <p class="sub">재고(입고분 전체), 팀 요청·채팅, 입출고·변경 기록을 모두 지워요. 팀 공유 저장소라 <b>모든 팀원 화면에서 함께 지워지고, 되돌릴 수 없어요.</b> 필요하면 먼저 홈의 '엑셀로 내보내기'로 백업해 두세요.</p>
+        <label class="check"><input type="checkbox" id="resetSettings">설정(재고 판정·발주 기준, 납품회사 목록)도 기본값으로 되돌리기</label>
+        <div class="actions">
+          <input class="input" id="resetConfirm" placeholder="확인하려면 '초기화'라고 입력" style="max-width:260px" aria-label="확인 문구 입력" autocomplete="off">
+          <button class="btn danger-fill" type="button" id="resetAll" disabled>전체 초기화</button>
+        </div>
+        <div class="busy" id="resetBusy" hidden></div>
       </section>
     </section>
   </main>
@@ -1459,7 +1472,7 @@ const LIST_COLS = [
   { key: 'location', label: '보관 위치', cell: it => esc(it.location || '-') },
   { key: 'act', label: '<span class="sr">관리</span>', sort: false, cell: it => `<div class="actions"><button class="btn sm" data-edit="${esc(it.id)}">수정</button><button class="btn sm danger" data-del="${esc(it.id)}">삭제</button></div>` },
 ];
-const MOVE_CLS = t => t === '출고' ? 's-hold' : t === '삭제' ? 's-bad' : t === '수정' || t === '상태 변경' ? 's-none' : 's-ok';
+const MOVE_CLS = t => t === '출고' ? 's-hold' : t === '삭제' || t === '전체 초기화' ? 's-bad' : t === '수정' || t === '상태 변경' ? 's-none' : 's-ok';
 const MOVE_COLS = [
   { key: 'at', label: '시간', cell: m => esc(stamp(m.at)) },
   { key: 'type', label: '구분', cell: m => `<span class="status ${MOVE_CLS(m.type)}">${esc(m.type)}</span>` },
@@ -2025,6 +2038,22 @@ function bind() {
     if (list.includes(name)) { toast('이미 등록된 회사예요.'); return; }
     if (await saveSettings({ ...state.settings, suppliers: [...list, name] })) { $('#supplierName').value = ''; toast(`'${name}'을(를) 납품회사 목록에 추가했어요.`); }
   });
+  // 전체 초기화: '초기화'를 정확히 입력해야 버튼이 켜진다
+  const resetReady = () => { $('#resetAll').disabled = $('#resetConfirm').value.trim() !== '초기화' || !state.canWrite || state.busy; };
+  $('#resetConfirm').addEventListener('input', resetReady);
+  $('#resetAll').addEventListener('click', async () => {
+    resetReady(); if ($('#resetAll').disabled) return;
+    const withSettings = $('#resetSettings').checked;
+    const counts = `재고 ${state.items.length}건 · 요청 ${state.requests.length}건 · 채팅 ${state.chats.length}건 · 기록 ${state.moves.length}건`;
+    setBusy('#resetBusy', '모두 지우고 있어요…');
+    let ok = false;
+    try { ok = await resetAll(withSettings); } finally { setBusy('#resetBusy', ''); }
+    if (ok) {
+      await logMove('전체 초기화', { detail: `${counts} 삭제${withSettings ? ' · 설정도 기본값으로' : ''}` });
+      $('#resetConfirm').value = ''; $('#resetSettings').checked = false; $('#filterForm').reset(); resetReady();
+      toast('전체 초기화했어요.');
+    }
+  });
   $('#loadExamples').addEventListener('click', loadExamples);
   $('#clearExamples').addEventListener('click', async () => {
     const ex = state.items.filter(i => i.example);
@@ -2034,6 +2063,32 @@ function bind() {
 
   // 요청 카드의 "N분 전"과 지연 표시를 1분마다 새로 그린다 (저장은 하지 않음)
   setInterval(() => { renderBoard(); renderHeader(); }, 60000);
+}
+/* 전체 초기화: 재고·요청·채팅·기록을 모두 지운다 (설정은 고른 경우에만) */
+async function resetAll(withSettings) {
+  if (!guardWrite()) return false;
+  const cols = ['items', 'requests', 'chats', 'moves'];
+  if (state.backend === 'supabase') {
+    for (const c of cols) {
+      const { error } = await state.sb.from(c).delete().neq('id', '');
+      if (error) return sbFailed(error);
+      state[c] = [];
+    }
+    if (withSettings) { const { error } = await state.sb.from('settings').delete().neq('id', ''); if (error) return sbFailed(error); }
+  } else if (state.mode === 'shared') {
+    for (const c of cols) {
+      for (const x of [...state[c]]) { try { await state.db.collection(c).doc(x.id).delete(); } catch (e) { return writeFailed(e); } }
+      state[c] = [];
+    }
+    if (withSettings) { try { await state.db.doc('config/settings').set({ ...DEFAULTS }); } catch (e) { return writeFailed(e); } }
+  } else {
+    for (const c of cols) { state[c] = []; local.write(LKEY[c], []); }
+    if (withSettings) local.write(KEY_SET, { ...DEFAULTS });
+  }
+  if (withSettings) state.settings = { ...DEFAULTS };
+  state.expanded.clear(); state.openReqs.clear(); state.detail = null; state.filters = {};
+  synced(); render(); renderSettingsForm();
+  return true;
 }
 async function loadExamples() {
   if (state.items.some(i => i.example)) { toast('예시 데이터가 이미 들어 있어요.'); return; }
