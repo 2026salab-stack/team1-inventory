@@ -246,6 +246,8 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
 .msg.sys{justify-self:center;background:none;color:var(--muted);font-size:12px;padding:0;text-align:center}
 .msg b{font-size:12px;margin-right:6px}
 .msg time{display:block;font-size:11px;color:var(--muted)}
+.thread-msgs{display:grid;gap:6px;max-height:260px;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}
+.unread{display:inline-block;margin-left:6px;background:var(--bad);color:var(--on-bad);border-radius:999px;padding:0 7px;font-size:11px;font-weight:700;line-height:18px}
 .reply{display:flex;gap:6px}
 .reply .input{height:36px}
 
@@ -337,6 +339,7 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
         <div class="dash-head" style="justify-content:flex-end">
           <div class="meta"><span id="lastUpdate">최종 업데이트 -</span>
             <button class="btn sm" id="exportBtn"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>엑셀로 내보내기</button>
+            <button class="btn sm" id="pdfHomeBtn" title="지금 보이는 조회 조건·정렬·분류 그대로 PDF로 내보내요"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 13h6M9 17h4"/></svg>PDF로 내보내기</button>
             <button class="btn sm" id="refreshBtn"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>새로고침</button>
           </div>
         </div>
@@ -814,11 +817,11 @@ async function dbAdd(col, list) {
     try {
       const rows = list.map(d => ({ id: uid() + Math.random().toString(36).slice(2, 6), data: d }));
       for (let i = 0; i < rows.length; i += 200) { const { error } = await state.sb.from(col).insert(rows.slice(i, i + 200)); if (error) throw error; }
-      rows.forEach(r => upsertLocal(col, fromRow(r))); synced(); render();
+      rows.forEach(r => upsertLocal(col, fromRow(r))); synced(); scheduleRender(scopeOf(col));
     } catch (e) { return sbFailed(e); }
   } else if (state.mode === 'shared') {
     try { for (const d of list) await state.db.collection(col).add(d); } catch (e) { return writeFailed(e); }
-  } else { state[col] = [...state[col], ...list.map(d => ({ ...d, id: uid() }))]; saveLocal(col); render(); }
+  } else { state[col] = [...state[col], ...list.map(d => ({ ...d, id: uid() }))]; saveLocal(col); scheduleRender(scopeOf(col)); }
   return true;
 }
 async function dbUpdate(col, id, patch) {
@@ -828,10 +831,10 @@ async function dbUpdate(col, id, patch) {
     const next = { ...cur, ...patch };
     try { const { error } = await state.sb.from(col).update({ data: toData(next) }).eq('id', id); if (error) throw error; }
     catch (e) { return sbFailed(e); }
-    upsertLocal(col, next); synced(); render();
+    upsertLocal(col, next); synced(); scheduleRender(scopeOf(col));
   } else if (state.mode === 'shared') {
     try { await state.db.collection(col).doc(id).update(patch); } catch (e) { return writeFailed(e); }
-  } else { state[col] = state[col].map(x => x.id === id ? { ...x, ...patch } : x); saveLocal(col); render(); }
+  } else { state[col] = state[col].map(x => x.id === id ? { ...x, ...patch } : x); saveLocal(col); scheduleRender(scopeOf(col)); }
   return true;
 }
 async function dbRemove(col, id) {
@@ -839,10 +842,10 @@ async function dbRemove(col, id) {
   if (state.backend === 'supabase') {
     try { const { error } = await state.sb.from(col).delete().eq('id', id); if (error) throw error; }
     catch (e) { return sbFailed(e); }
-    state[col] = state[col].filter(x => x.id !== id); synced(); render();
+    state[col] = state[col].filter(x => x.id !== id); synced(); scheduleRender(scopeOf(col));
   } else if (state.mode === 'shared') {
     try { await state.db.collection(col).doc(id).delete(); } catch (e) { return writeFailed(e); }
-  } else { state[col] = state[col].filter(x => x.id !== id); saveLocal(col); render(); }
+  } else { state[col] = state[col].filter(x => x.id !== id); saveLocal(col); scheduleRender(scopeOf(col)); }
   return true;
 }
 const addItems = list => { const now = Date.now(); return dbAdd('items', list.map(x => cleanItem({ qtyUnit: '개', ...x, createdAt: now, updatedAt: now }))); };
@@ -1085,6 +1088,7 @@ function renderHeader() {
   renderReqPop();
   $('#reqBadge').hidden = !n; $('#reqBadge').textContent = n;
   $('#exportBtn').hidden = !!window.claude && !state.downloads;
+  $('#pdfHomeBtn').hidden = $('#exportBtn').hidden;
 }
 /* 상단 "새 요청 N건"을 누르면 어떤 요청인지 바로 보이는 창 */
 function renderReqPop() {
@@ -1327,32 +1331,26 @@ function renderPreview() {
     <td>${esc(normClimate(r.climate) || '분류 중')}${srcTag(r)}</td><td>${esc(r.reason || '-')}</td></tr>`).join('');
   $('#importSave').textContent = `${toSave}건 저장하기`;
 }
-/* 업로드 창 내용을 PDF로 저장: 한 쪽에 10줄씩 따로 그려서 A4 가로 한 장에 담는다 (줄이 쪽 사이에서 잘리지 않음) */
+/* 표를 PDF로 만든다: 쪽마다 따로 그려서 A4 가로 한 장에 담는다 (줄이 쪽 사이에서 잘리지 않음)
+   pages: 쪽별 tbody 줄(HTML) 배열, title: 첫 쪽 머리말, runHead: 둘째 쪽부터 위에 붙는 한 줄 */
 const PDF_ROWS_PER_PAGE = 10;
-async function exportUploadPdf() {
-  if (!window.html2canvas || !window.jspdf) { toast('PDF 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'); return; }
+async function makeTablePdf({ title, runHead, headHtml, pages, filename, progress }) {
+  if (!window.html2canvas || !window.jspdf) { toast('PDF 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'); return false; }
   const stage = $('#pdfStage');
-  const kind = state.pendingKind === 'out' ? '출고' : '입고';
-  const headHtml = `<thead>${$('#previewHead').innerHTML}</thead>`;
-  const rows = [...$('#previewRows').children].map(tr => tr.outerHTML);
-  const groups = [];
-  for (let i = 0; i < rows.length; i += PDF_ROWS_PER_PAGE) groups.push(rows.slice(i, i + PDF_ROWS_PER_PAGE));
-  if (!groups.length) groups.push([]);
-  const title = `<h1>엑셀 업로드 내역 · ${kind}</h1><p>${esc(state.pendingFile)} · 만든 시각 ${esc(stamp(Date.now()))} · 기준일 ${esc(state.baseDate)}</p><p>${esc($('#previewInfo').textContent)}</p>`;
-  const btn = $('#pdfBtn'); btn.disabled = true;
+  if (!pages.length) pages = [[]];
   try {
     // 모든 쪽의 열 너비를 똑같이 맞추려고, 전체 표를 한 번 그려 열 너비를 재 둔다
-    stage.innerHTML = `<table class="grid">${headHtml}<tbody>${rows.join('')}</tbody></table>`;
+    stage.innerHTML = `<table class="grid">${headHtml}<tbody>${pages.flat().join('')}</tbody></table>`;
     const widths = [...stage.querySelectorAll('thead th')].map(th => Math.ceil(th.getBoundingClientRect().width));
     const cols = `<colgroup>${widths.map(wd => `<col style="width:${wd}px">`).join('')}</colgroup>`;
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const pageW = 297, pageH = 210, margin = 8, maxW = pageW - margin * 2, maxH = pageH - margin * 2;
-    for (let i = 0; i < groups.length; i++) {
-      stage.innerHTML = `${i === 0 ? title : `<p>엑셀 업로드 내역 · ${kind} · ${esc(state.pendingFile)}</p>`}
-        <table class="grid" style="table-layout:fixed;width:${widths.reduce((s, x) => s + x, 0)}px">${cols}${headHtml}<tbody>${groups[i].join('')}</tbody></table>
-        <p class="pdf-foot">${i + 1} / ${groups.length} 쪽</p>`;
-      setBusy('#importBusy', `PDF를 만들고 있어요… (${i + 1}/${groups.length}쪽)`);
+    for (let i = 0; i < pages.length; i++) {
+      stage.innerHTML = `${i === 0 ? title : `<p>${runHead}</p>`}
+        <table class="grid" style="table-layout:fixed;width:${widths.reduce((s, x) => s + x, 0)}px">${cols}${headHtml}<tbody>${pages[i].join('')}</tbody></table>
+        <p class="pdf-foot">${i + 1} / ${pages.length} 쪽</p>`;
+      if (progress) progress(i + 1, pages.length);
       const canvas = await window.html2canvas(stage, { scale: 2, backgroundColor: '#FFFFFF', useCORS: true, scrollX: 0, scrollY: 0,
         onclone: doc => { const el = doc.getElementById('pdfStage'); el.style.left = '0'; el.style.top = '0'; el.style.position = 'absolute'; } });
       // 쪽 하나가 A4보다 크면 비율을 유지한 채 줄여서 한 장에 다 넣는다
@@ -1361,14 +1359,77 @@ async function exportUploadPdf() {
       if (i) pdf.addPage();
       pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, wmm, hmm);
     }
-    const filename = `엑셀업로드_${kind}_${state.baseDate}.pdf`;
     if (state.downloads) {
       try { await state.downloads.save({ filename, data: pdf.output('arraybuffer') }); toast('PDF를 저장했어요.'); }
       catch (e) { if (!e || e.code !== 'declined') toast('이 화면에서는 PDF를 저장할 수 없어요.'); }
     } else if (!window.claude) { pdf.save(filename); toast('PDF를 내려받았어요.'); }
     else toast('이 화면에서는 PDF를 저장할 수 없어요.');
-  } catch (e) { console.error(e); toast('PDF를 만들지 못했어요. 잠시 후 다시 시도해 주세요.'); }
-  finally { setBusy('#importBusy', ''); btn.disabled = false; stage.innerHTML = ''; }
+    return true;
+  } catch (e) { console.error(e); toast('PDF를 만들지 못했어요. 잠시 후 다시 시도해 주세요.'); return false; }
+  finally { stage.innerHTML = ''; }
+}
+/* 업로드 창 내용 → PDF */
+async function exportUploadPdf() {
+  const kind = state.pendingKind === 'out' ? '출고' : '입고';
+  const rows = [...$('#previewRows').children].map(tr => tr.outerHTML);
+  const pages = [];
+  for (let i = 0; i < rows.length; i += PDF_ROWS_PER_PAGE) pages.push(rows.slice(i, i + PDF_ROWS_PER_PAGE));
+  const btn = $('#pdfBtn'); btn.disabled = true;
+  try {
+    await makeTablePdf({
+      title: `<h1>엑셀 업로드 내역 · ${kind}</h1><p>${esc(state.pendingFile)} · 만든 시각 ${esc(stamp(Date.now()))} · 기준일 ${esc(state.baseDate)}</p><p>${esc($('#previewInfo').textContent)}</p>`,
+      runHead: `엑셀 업로드 내역 · ${kind} · ${esc(state.pendingFile)}`,
+      headHtml: `<thead>${$('#previewHead').innerHTML}</thead>`, pages,
+      filename: `엑셀업로드_${kind}_${state.baseDate}.pdf`,
+      progress: (n, t) => setBusy('#importBusy', `PDF를 만들고 있어요… (${n}/${t}쪽)`),
+    });
+  } finally { setBusy('#importBusy', ''); btn.disabled = false; }
+}
+/* 홈 화면 표 → PDF: 지금 보이는 그대로(조회 조건·정렬·기준일·자재 분류 묶음) 한 쪽에 품목 10개씩 */
+const PDF_HOME_COLS = [
+  { key: '_no', label: '#', no: true },
+  { key: 'name', label: '품목명', cell: p => `${esc(p.name)}<span class="sub-cell">${p.code ? esc(p.code) + ' · ' : ''}입고분 ${p.lots.length}건</span>` },
+  ...HOME_COLS.filter(c => c.key !== '_no' && c.key !== 'name'),
+];
+async function exportHomePdf() {
+  const a = analyze(), shown = visibleProducts(a);
+  if (!shown.length) { toast('PDF로 내보낼 품목이 없어요. 조회 조건을 확인해 주세요.'); return; }
+  // 화면과 같은 순서로 줄 목록을 만든다 (분류별로 묶고, 분류 안에서는 고른 정렬)
+  const items = [];
+  CATEGORIES.forEach(cat => {
+    const rows = shown.filter(p => p.category === cat);
+    if (!rows.length) return;
+    const groupInfo = `${rows.length}개 품목 · 사용 가능 ${fmt(rows.reduce((s, p) => s + p.usable, 0))}개`;
+    sortRows('home', rows, HOME_COLS).forEach(p => items.push({ cat, groupInfo, p }));
+  });
+  const span = PDF_HOME_COLS.length;
+  const rowHtml = (p, n) => `<tr>${PDF_HOME_COLS.map(c => c.no ? `<td class="row-no">${n}</td>` : `<td${c.num ? ' class="num"' : ''}>${c.cell ? c.cell(p) : esc(p[c.key] ?? '-')}</td>`).join('')}</tr>`;
+  const pages = [];
+  for (let i = 0; i < items.length; i += PDF_ROWS_PER_PAGE) {
+    let prev = null;
+    pages.push(items.slice(i, i + PDF_ROWS_PER_PAGE).map((it, k) => {
+      // 쪽이 바뀌어도 분류 제목 줄을 다시 붙여 어느 분류인지 알 수 있게 한다
+      const head = it.cat !== prev ? `<tr class="group"><td colspan="${span}">${esc(it.cat)}${prev === null && i > 0 && items[i - 1].cat === it.cat ? ' (이어서)' : ''}<small>${it.groupInfo}</small></td></tr>` : '';
+      prev = it.cat;
+      return head + rowHtml(it.p, i + k + 1);
+    }));
+  }
+  const f = state.filters, active = Object.entries(f).filter(([, v]) => v);
+  const LABEL = { name: '품목명', supplier: '납품회사', sizeNum: '단위', sizeUnit: '단위', spec: '규격', category: '자재 분류', status: '품질 상태', date: '입고일 이후' };
+  const cond = active.length ? active.map(([k, v]) => `${LABEL[k] || k}: ${esc(v)}`).join(' · ') : '전체';
+  const sum = k => shown.reduce((s, p) => s + p[k], 0);
+  const sortCol = HOME_COLS.find(c => c.key === state.sort.home.key);
+  const btn = $('#pdfHomeBtn'); btn.disabled = true; toast('PDF를 만들고 있어요…');
+  try {
+    await makeTablePdf({
+      title: `<h1>재고 현황 · 자재 분류별</h1><p>기준일 ${esc(state.baseDate)} · 만든 시각 ${esc(stamp(Date.now()))} · 조회 조건: ${cond}${sortCol ? ` · 정렬: ${esc(sortCol.label)} ${state.sort.home.dir === 'asc' ? '오름차순' : '내림차순'}` : ''}</p>
+        <p>${shown.length}개 품목 · 총 재고 ${fmt(sum('total'))}개 · 사용 가능 ${fmt(sum('usable'))}개 · 보류/불량 ${fmt(sum('blocked'))}개 · 부족 ${shown.filter(p => p.judge === 'short').length}개 품목</p>`,
+      runHead: `재고 현황 · 기준일 ${esc(state.baseDate)} · 조회 조건: ${cond}`,
+      headHtml: `<thead><tr>${PDF_HOME_COLS.map(c => `<th${c.num ? ' class="num"' : ''}>${c.label}</th>`).join('')}</tr></thead>`,
+      pages, filename: `재고현황_${state.baseDate}.pdf`,
+      progress: (n, t) => toast(`PDF를 만들고 있어요… (${n}/${t}쪽)`),
+    });
+  } finally { btn.disabled = false; }
 }
 
 /* ───────── 화면: 입력·요청 ───────── */
@@ -1387,18 +1448,34 @@ function renderEntry(a) {
   const req = state.outReqId && state.requests.find(r => r.id === state.outReqId);
   $('#outReqNote').hidden = !req; $('#outReqClear').hidden = !req;
   if (req) $('#outReqNote').textContent = `${req.team} 요청을 처리하는 출고예요. 출고하면 요청이 자동으로 완료돼요.`;
-  const rp = productsByName($('#rItem').value);
+  const rItem = $('#rItem').value.trim(), rp = rItem ? a.products.filter(p => p.name === rItem) : [];
   $('#rUnit').textContent = rp.length ? `(${rp[0].unit})` : '(품목 단위)';
 }
-function ticketHtml(r) {
+/* 안 읽은 메시지: 대화를 마지막으로 연 시각을 이 기기에 기억해 둔다 */
+const KEY_SEEN = 'inv.seen.v1';
+state.seen = local.read(KEY_SEEN, {});
+function markSeen(reqId) { state.seen[reqId] = Date.now(); local.write(KEY_SEEN, state.seen); }
+/* 주문판을 한 번 그릴 때 필요한 계산(품목별 재고, 요청별 대화)을 한 번만 해 둔다 */
+function boardContext() {
+  const byName = new Map();
+  for (const p of analyze().products) { const k = String(p.name || '').trim(); if (!byName.has(k)) byName.set(k, []); byName.get(k).push(p); }
+  const chatsByReq = new Map();
+  for (const c of state.chats) { if (!chatsByReq.has(c.reqId)) chatsByReq.set(c.reqId, []); chatsByReq.get(c.reqId).push(c); }
+  for (const list of chatsByReq.values()) list.sort((x, y) => (x.at || 0) - (y.at || 0));
+  return { byName, chatsByReq };
+}
+function ticketHtml(r, ctx) {
   const late = r.status === 'new' && Date.now() - (r.createdAt || 0) > LATE_MIN * 60000;
   const typeCls = r.type === '불편사항' ? 'issue' : r.type === '기타' ? 'etc' : '';
-  const msgs = state.chats.filter(c => c.reqId === r.id).sort((x, y) => (x.at || 0) - (y.at || 0));
-  const userMsgs = msgs.filter(m => !m.system).length;
+  const msgs = ctx.chatsByReq.get(r.id) || [];
+  const userMsgs = msgs.filter(m => !m.system);
+  const me = state.me.team, open = state.openReqs.has(r.id);
+  const unread = open ? 0 : userMsgs.filter(m => (m.at || 0) > (state.seen[r.id] || 0) && m.team !== me).length;
   let avail = '';
-  const unit = r.qtyUnit || (productsByName(r.item)[0] || {}).unit || '개';
+  const named = ctx.byName.get(String(r.item || '').trim()) || [];
+  const unit = r.qtyUnit || (named[0] || {}).unit || '개';
   if (r.type === '재고 요청' && r.item) {
-    const ps = productsByName(r.item, unit);
+    const ps = named.filter(p => p.unit === unit);
     if (!ps.length) avail = '<span class="avail none">재고 목록에 없는 품목이에요</span>';
     else {
       const u = ps.reduce((s, p) => s + p.usable, 0), h = ps.reduce((s, p) => s + p.hold, 0);
@@ -1414,22 +1491,25 @@ function ticketHtml(r) {
     : r.status === 'doing'
     ? `${stock ? `<button class="btn sm primary" data-req-out="${id}">출고 처리</button>` : ''}<button class="btn sm${stock ? '' : ' primary'}" data-req-act="done" data-id="${id}">완료</button><button class="btn sm" data-req-act="new" data-id="${id}">대기로</button>`
     : `<button class="btn sm" data-req-act="new" data-id="${id}">다시 열기</button>`;
-  const open = state.openReqs.has(r.id), me = state.me.team;
   return `<article class="ticket${late ? ' late' : ''}${r.status === 'done' || r.status === 'rejected' ? ' closed' : ''}">
     <div class="t-head"><span class="t-team">${esc(r.team)}</span>${r.name ? `<span class="t-who">${esc(r.name)}</span>` : ''}<span class="t-type ${typeCls}">${esc(r.type)}</span>
       ${r.status === 'rejected' ? '<span class="status s-bad">반려</span>' : ''}<span class="t-time" title="${esc(stamp(r.createdAt))}">${esc(ago(r.createdAt))}</span></div>
     ${late ? `<span class="t-late">${LATE_MIN}분 넘게 대기 중</span>` : ''}
     ${r.item ? `<p class="t-item"><b>${esc(r.item)}</b>${isNum(r.qty) ? ` ${fmtQ(r.qty, unit)}` : ''}${avail}</p>` : ''}
     <p class="t-text">${esc(r.text)}</p>
-    <div class="t-actions">${acts}<button class="btn sm" data-req-toggle="${id}" aria-expanded="${open}">대화${userMsgs ? ' ' + userMsgs : ''}</button></div>
-    ${open ? `<div class="thread">${msgs.map(m => m.system
+    <div class="t-actions">${acts}<button class="btn sm" data-req-toggle="${id}" aria-expanded="${open}">대화${userMsgs.length ? ' ' + userMsgs.length : ''}${unread ? `<span class="unread">새 ${unread}</span>` : ''}</button></div>
+    ${open ? `<div class="thread"><div class="thread-msgs" data-thread="${id}">${msgs.map(m => m.system
         ? `<div class="msg sys">${esc(m.text)} · ${esc(ago(m.at))}</div>`
         : `<div class="msg${m.team === me ? ' mine' : ''}"><b>${esc(m.team)}${m.name ? ' ' + esc(m.name) : ''}</b>${esc(m.text)}<time>${esc(ago(m.at))}</time></div>`).join('')
-      || '<div class="msg sys">아직 대화가 없어요.</div>'}
+      || '<div class="msg sys">아직 대화가 없어요.</div>'}</div>
       <form class="reply" data-reply="${id}"><input class="input" name="t" placeholder="답장 쓰기" aria-label="답장" required><button class="btn sm primary">보내기</button></form></div>` : ''}
   </article>`;
 }
 function renderBoard() {
+  // 입력·요청 화면이 안 보일 때는 그리지 않고, 화면을 열 때 그린다
+  if (state.view !== 'input') { state.boardDirty = true; return; }
+  state.boardDirty = false;
+  const ctx = boardContext();
   $$('#rType [data-type]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.type === state.reqType)));
   $('#rItemRow').hidden = state.reqType !== '재고 요청';
   $$('#reqFilter [data-f]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === state.reqFilter)));
@@ -1441,18 +1521,38 @@ function renderBoard() {
   };
   const empty = { New: '새 요청이 없어요', Doing: '처리 중인 요청이 없어요', Done: '완료된 요청이 없어요' };
   // 다시 그려도 쓰고 있던 답장과 커서는 그대로 둔다
-  const drafts = {}; let focused = null;
+  // 대화창 스크롤 위치: 맨 아래를 보고 있었으면 새 메시지가 와도 맨 아래로, 위를 읽고 있었으면 그대로
+  const drafts = {}, scroll = {}; let focused = null;
   $$('form[data-reply]').forEach(f => { drafts[f.dataset.reply] = f.elements.t.value; if (document.activeElement === f.elements.t) focused = f.dataset.reply; });
+  $$('[data-thread]').forEach(el => { scroll[el.dataset.thread] = el.scrollHeight - el.scrollTop - el.clientHeight < 24 ? 'bottom' : el.scrollTop; });
   for (const k of Object.keys(lanes)) {
-    $('#lane' + k).innerHTML = lanes[k].length ? lanes[k].map(ticketHtml).join('') : `<div class="lane-empty">${empty[k]}</div>`;
+    const html = lanes[k].length ? lanes[k].map(r => ticketHtml(r, ctx)).join('') : `<div class="lane-empty">${empty[k]}</div>`;
+    const el = $('#lane' + k);
+    if (el.innerHTML !== html) el.innerHTML = html;   // 바뀐 칸만 다시 그린다
     $('#c' + k).textContent = k === 'Done' ? list.filter(r => r.status === 'done' || r.status === 'rejected').length : lanes[k].length;
   }
+  $$('[data-thread]').forEach(el => { const s = scroll[el.dataset.thread]; el.scrollTop = s === undefined || s === 'bottom' ? el.scrollHeight : s; });
   $$('form[data-reply]').forEach(f => {
     const id = f.dataset.reply;
     if (drafts[id]) f.elements.t.value = drafts[id];
     if (focused === id) { const t = f.elements.t; t.focus({ preventScroll: true }); t.setSelectionRange(t.value.length, t.value.length); }
   });
+  // 열려 있는 대화는 읽은 것으로 표시
+  state.openReqs.forEach(id => markSeen(id));
 }
+/* 여러 변경이 한꺼번에 와도 다음 화면 갱신 때 한 번만 그린다. 'board'는 주문판·알림만, 'all'은 전체 */
+let renderQueued = null;
+function scheduleRender(scope = 'all') {
+  if (renderQueued === 'all') return;
+  const first = renderQueued === null;
+  renderQueued = scope === 'all' ? 'all' : (renderQueued || 'board');
+  if (!first) return;
+  requestAnimationFrame(() => {
+    const s = renderQueued; renderQueued = null;
+    if (s === 'all') render(); else { renderHeader(); renderBoard(); }
+  });
+}
+const scopeOf = col => col === 'chats' || col === 'requests' ? 'board' : 'all';
 
 /* ───────── 화면: 조회 ───────── */
 const LIST_COLS = [
@@ -1548,6 +1648,7 @@ function setView(v) {
   $$('.navbtn').forEach(b => b.removeAttribute('aria-current'));
   $(`.navbtn[data-view="${v}"]`).setAttribute('aria-current', 'page');
   if (v === 'settings') renderSettingsForm();
+  if (v === 'input') renderBoard();
   window.scrollTo({ top: 0 });
 }
 
@@ -1779,6 +1880,7 @@ function bind() {
     finally { btn.disabled = false; }
   });
   $('#exportBtn').addEventListener('click', exportExcel);
+  $('#pdfHomeBtn').addEventListener('click', exportHomePdf);
   bindDrop('#homeDrop', '#homeFile');
   $('#importDup').addEventListener('change', renderPreview);
   const closeUpload = () => { state.pending = null; renderPreview(); };
@@ -2126,10 +2228,10 @@ async function connectPlatform() {
     state.mode = 'shared'; synced(); render();
   }, lost);
   db.collection('requests').orderBy('createdAt', 'desc').limit(300).onSnapshot(snap => {
-    state.requests = snap.docs.map(d => ({ id: d.id, ...d.data() })); state.lastChat = Date.now(); synced(); render();
+    state.requests = snap.docs.map(d => ({ id: d.id, ...d.data() })); state.lastChat = Date.now(); synced(); scheduleRender('board');
   }, lost);
   db.collection('chats').orderBy('at', 'desc').limit(800).onSnapshot(snap => {
-    state.chats = snap.docs.map(d => ({ id: d.id, ...d.data() })); state.lastChat = Date.now(); synced(); renderBoard(); renderHeader();
+    state.chats = snap.docs.map(d => ({ id: d.id, ...d.data() })); state.lastChat = Date.now(); synced(); scheduleRender('board');
   }, lost);
   db.collection('moves').orderBy('at', 'desc').limit(1000).onSnapshot(snap => {
     state.moves = snap.docs.map(d => ({ id: d.id, ...d.data() })); synced(); render();
@@ -2172,7 +2274,7 @@ async function connectSupabase() {
       else if (payload.eventType === 'DELETE') state[t] = state[t].filter(x => x.id !== (payload.old && payload.old.id));
       else if (payload.new) upsertLocal(t, fromRow(payload.new));
       if (t === 'chats' || t === 'requests') state.lastChat = Date.now();
-      synced(); render();
+      synced(); scheduleRender(t === 'settings' ? 'all' : scopeOf(t));
     });
   }
   let poll = null;
