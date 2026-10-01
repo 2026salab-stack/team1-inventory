@@ -130,6 +130,8 @@ tr.group td small{font-weight:500;color:var(--muted);margin-left:8px}
 .pdf-stage h1{font:700 20px var(--font-display);margin:0 0 4px;color:#1D7349}
 .pdf-stage p{margin:0 0 12px;color:#5E6E63}
 .pdf-stage table.grid{font-size:12px}
+.pdf-stage .pdf-foot{margin:10px 0 0;text-align:right;font-size:12px}
+.pdf-stage table.grid td{overflow-wrap:anywhere}
 .pdf-stage table.grid td,.pdf-stage table.grid th{white-space:normal;padding:9px 7px}
 .pdf-stage table.grid th,.pdf-stage table.grid td.num,.pdf-stage table.grid td.row-no{white-space:nowrap;word-break:keep-all}
 .pdf-stage table.grid td{word-break:keep-all}
@@ -1312,42 +1314,39 @@ function renderPreview() {
     <td>${esc(normClimate(r.climate) || '분류 중')}${srcTag(r)}</td><td>${esc(r.reason || '-')}</td></tr>`).join('');
   $('#importSave').textContent = `${toSave}건 저장하기`;
 }
-/* 업로드 창 내용을 PDF로 저장: 화면 밖에 흰 바탕 문서를 만들어 그림으로 찍은 뒤 A4 가로로 나눠 담는다 */
+/* 업로드 창 내용을 PDF로 저장: 한 쪽에 10줄씩 따로 그려서 A4 가로 한 장에 담는다 (줄이 쪽 사이에서 잘리지 않음) */
+const PDF_ROWS_PER_PAGE = 10;
 async function exportUploadPdf() {
   if (!window.html2canvas || !window.jspdf) { toast('PDF 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'); return; }
   const stage = $('#pdfStage');
   const kind = state.pendingKind === 'out' ? '출고' : '입고';
-  stage.innerHTML = `<h1>엑셀 업로드 내역 · ${kind}</h1><p>${esc(state.pendingFile)} · 만든 시각 ${esc(stamp(Date.now()))} · 기준일 ${esc(state.baseDate)}</p>
-    <p>${esc($('#previewInfo').textContent)}</p><table class="grid">${$('#previewHead').outerHTML}${$('#previewRows').outerHTML}</table>`;
+  const headHtml = `<thead>${$('#previewHead').innerHTML}</thead>`;
+  const rows = [...$('#previewRows').children].map(tr => tr.outerHTML);
+  const groups = [];
+  for (let i = 0; i < rows.length; i += PDF_ROWS_PER_PAGE) groups.push(rows.slice(i, i + PDF_ROWS_PER_PAGE));
+  if (!groups.length) groups.push([]);
+  const title = `<h1>엑셀 업로드 내역 · ${kind}</h1><p>${esc(state.pendingFile)} · 만든 시각 ${esc(stamp(Date.now()))} · 기준일 ${esc(state.baseDate)}</p><p>${esc($('#previewInfo').textContent)}</p>`;
   const btn = $('#pdfBtn'); btn.disabled = true;
   try {
-    // 찍기 전에 표의 각 줄이 끝나는 위치를 재 둔다 → 페이지를 줄 경계에서만 나눠 글자가 잘리지 않게
-    const base = stage.getBoundingClientRect();
-    const head = stage.querySelector('thead').getBoundingClientRect();
-    const rowEnds = [...stage.querySelectorAll('tbody tr')].map(tr => tr.getBoundingClientRect().bottom - base.top);
-    const canvas = await window.html2canvas(stage, { scale: 2, backgroundColor: '#FFFFFF', useCORS: true, scrollX: 0, scrollY: 0,
-      onclone: doc => { const el = doc.getElementById('pdfStage'); el.style.left = '0'; el.style.top = '0'; el.style.position = 'absolute'; } });
-    const ratio = canvas.width / base.width;
-    const breaks = rowEnds.map(v => Math.round(v * ratio));
-    const headTop = Math.round((head.top - base.top) * ratio), headH = Math.round(head.height * ratio);
+    // 모든 쪽의 열 너비를 똑같이 맞추려고, 전체 표를 한 번 그려 열 너비를 재 둔다
+    stage.innerHTML = `<table class="grid">${headHtml}<tbody>${rows.join('')}</tbody></table>`;
+    const widths = [...stage.querySelectorAll('thead th')].map(th => Math.ceil(th.getBoundingClientRect().width));
+    const cols = `<colgroup>${widths.map(wd => `<col style="width:${wd}px">`).join('')}</colgroup>`;
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const pageW = 297, pageH = 210, margin = 8;
-    const w = pageW - margin * 2, pxPerMm = canvas.width / w, pageHpx = Math.floor((pageH - margin * 2) * pxPerMm);
-    const slice = (y, h) => { const c = document.createElement('canvas'); c.width = canvas.width; c.height = h; c.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h); return c.toDataURL('image/jpeg', 0.92); };
-    for (let y = 0, page = 0; y < canvas.height - 2; page++) {
-      // 두 번째 쪽부터는 위에 표 제목 줄을 다시 붙인다
-      const room = pageHpx - (page ? headH : 0);
-      let end = Math.min(canvas.height, y + room);
-      if (end < canvas.height) {
-        const fit = breaks.filter(b => b > y + 4 && b <= y + room);
-        if (fit.length) end = fit[fit.length - 1];   // 들어가는 마지막 줄 끝에서 자른다
-      }
-      if (page) pdf.addPage();
-      let top = margin;
-      if (page) { pdf.addImage(slice(headTop, headH), 'JPEG', margin, top, w, headH / pxPerMm); top += headH / pxPerMm; }
-      pdf.addImage(slice(y, end - y), 'JPEG', margin, top, w, (end - y) / pxPerMm);
-      y = end;
+    const pageW = 297, pageH = 210, margin = 8, maxW = pageW - margin * 2, maxH = pageH - margin * 2;
+    for (let i = 0; i < groups.length; i++) {
+      stage.innerHTML = `${i === 0 ? title : `<p>엑셀 업로드 내역 · ${kind} · ${esc(state.pendingFile)}</p>`}
+        <table class="grid" style="table-layout:fixed;width:${widths.reduce((s, x) => s + x, 0)}px">${cols}${headHtml}<tbody>${groups[i].join('')}</tbody></table>
+        <p class="pdf-foot">${i + 1} / ${groups.length} 쪽</p>`;
+      setBusy('#importBusy', `PDF를 만들고 있어요… (${i + 1}/${groups.length}쪽)`);
+      const canvas = await window.html2canvas(stage, { scale: 2, backgroundColor: '#FFFFFF', useCORS: true, scrollX: 0, scrollY: 0,
+        onclone: doc => { const el = doc.getElementById('pdfStage'); el.style.left = '0'; el.style.top = '0'; el.style.position = 'absolute'; } });
+      // 쪽 하나가 A4보다 크면 비율을 유지한 채 줄여서 한 장에 다 넣는다
+      let wmm = maxW, hmm = canvas.height * maxW / canvas.width;
+      if (hmm > maxH) { wmm *= maxH / hmm; hmm = maxH; }
+      if (i) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, wmm, hmm);
     }
     const filename = `엑셀업로드_${kind}_${state.baseDate}.pdf`;
     if (state.downloads) {
@@ -1356,7 +1355,7 @@ async function exportUploadPdf() {
     } else if (!window.claude) { pdf.save(filename); toast('PDF를 내려받았어요.'); }
     else toast('이 화면에서는 PDF를 저장할 수 없어요.');
   } catch (e) { console.error(e); toast('PDF를 만들지 못했어요. 잠시 후 다시 시도해 주세요.'); }
-  finally { btn.disabled = false; stage.innerHTML = ''; }
+  finally { setBusy('#importBusy', ''); btn.disabled = false; stage.innerHTML = ''; }
 }
 
 /* ───────── 화면: 입력·요청 ───────── */
