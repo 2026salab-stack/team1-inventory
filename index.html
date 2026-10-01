@@ -583,7 +583,7 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
         <label class="check"><input type="checkbox" id="resetSettings">설정(재고 판정·발주 기준, 납품회사 목록)도 기본값으로 되돌리기</label>
         <div class="actions">
           <input class="input" id="resetConfirm" placeholder="확인하려면 '초기화'라고 입력" style="max-width:260px" aria-label="확인 문구 입력" autocomplete="off">
-          <button class="btn danger-fill" type="button" id="resetAll" disabled>전체 초기화</button>
+          <button class="btn danger-fill" type="button" id="resetAll">전체 초기화</button>
         </div>
         <div class="busy" id="resetBusy" hidden></div>
       </section>
@@ -2038,11 +2038,13 @@ function bind() {
     if (list.includes(name)) { toast('이미 등록된 회사예요.'); return; }
     if (await saveSettings({ ...state.settings, suppliers: [...list, name] })) { $('#supplierName').value = ''; toast(`'${name}'을(를) 납품회사 목록에 추가했어요.`); }
   });
-  // 전체 초기화: '초기화'를 정확히 입력해야 버튼이 켜진다
-  const resetReady = () => { $('#resetAll').disabled = $('#resetConfirm').value.trim() !== '초기화' || !state.canWrite || state.busy; };
-  $('#resetConfirm').addEventListener('input', resetReady);
-  $('#resetAll').addEventListener('click', async () => {
-    resetReady(); if ($('#resetAll').disabled) return;
+  // 전체 초기화: 버튼은 늘 눌리게 두고, 누를 때 확인 문구를 검사한다
+  // (한글 입력 중 마지막 글자가 조합 중이면 '초기'로 읽혀 버튼이 꺼진 채 남는 문제를 피하려고)
+  const confirmText = () => $('#resetConfirm').value.replace(/[\s'"‘’“”]/g, '');
+  const doReset = async () => {
+    if (state.busy) return;
+    if (confirmText() !== '초기화') { toast("확인 칸에 '초기화'라고 정확히 입력해 주세요."); $('#resetConfirm').focus(); return; }
+    if (!guardWrite()) return;
     const withSettings = $('#resetSettings').checked;
     const counts = `재고 ${state.items.length}건 · 요청 ${state.requests.length}건 · 채팅 ${state.chats.length}건 · 기록 ${state.moves.length}건`;
     setBusy('#resetBusy', '모두 지우고 있어요…');
@@ -2050,10 +2052,12 @@ function bind() {
     try { ok = await resetAll(withSettings); } finally { setBusy('#resetBusy', ''); }
     if (ok) {
       await logMove('전체 초기화', { detail: `${counts} 삭제${withSettings ? ' · 설정도 기본값으로' : ''}` });
-      $('#resetConfirm').value = ''; $('#resetSettings').checked = false; $('#filterForm').reset(); resetReady();
+      $('#resetConfirm').value = ''; $('#resetSettings').checked = false; $('#filterForm').reset();
       toast('전체 초기화했어요.');
     }
-  });
+  };
+  $('#resetAll').addEventListener('click', doReset);
+  $('#resetConfirm').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); doReset(); } });
   $('#loadExamples').addEventListener('click', loadExamples);
   $('#clearExamples').addEventListener('click', async () => {
     const ex = state.items.filter(i => i.example);
