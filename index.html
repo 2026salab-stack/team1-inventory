@@ -110,6 +110,26 @@ textarea.input{height:auto;min-height:64px;padding:10px 12px;resize:vertical;lin
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .seg.wide{display:flex}
 .seg.wide button{flex:1}
+.modal-back{position:fixed;inset:0;background:rgba(10,20,14,.55);z-index:30;display:grid;place-items:center;padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(env(safe-area-inset-bottom,0px) + 16px)}
+.modal{width:min(1240px,100%);max-height:100%;overflow:auto;padding:20px;display:grid;gap:12px;align-content:start}
+.modal-table{max-height:56vh;overflow:auto}
+.modal-table thead th{position:sticky;top:0;z-index:1}
+.bulk-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--surface-2);border-radius:12px;padding:10px 12px}
+.bulk-row label{font-weight:600;font-size:13px}
+.bulk-row .input{max-width:300px;height:36px}
+tr.group td{background:var(--accent-soft);color:var(--accent);font-weight:700;padding:8px 12px;border-bottom:0}
+tr.group td small{font-weight:500;color:var(--muted);margin-left:8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip-x{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px}
+.chip-x button{border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:2px 6px;border-radius:999px}
+.chip-x button:hover{color:var(--bad)}
+/* PDF 전용: 테마와 상관없이 흰 바탕·검은 글씨 */
+.pdf-stage{position:fixed;left:-10000px;top:0;width:1120px;background:#FFFFFF;color:#16211A;padding:28px;font:13px/1.5 var(--font-body);
+  --bg:#FFFFFF;--surface:#FFFFFF;--surface-2:#F2F5F3;--line:#D9E1DB;--fg:#16211A;--muted:#5E6E63;--accent:#1D7349;--accent-soft:#E2F0E7;
+  --ok:#1D7349;--ok-soft:#EAF5EE;--warn:#B8650F;--warn-soft:#FCF1E3;--bad:#C2352F;--bad-soft:#FBEAE9}
+.pdf-stage h1{font:700 20px var(--font-display);margin:0 0 4px;color:#1D7349}
+.pdf-stage p{margin:0 0 12px;color:#5E6E63}
+.pdf-stage table.grid td,.pdf-stage table.grid th{white-space:normal}
 .req-anchor{position:relative}
 .req-pop{position:absolute;right:0;top:calc(100% + 8px);width:min(380px,calc(100vw - 32px));max-height:min(480px,70vh);overflow:auto;z-index:20;padding:14px;display:grid;gap:10px;box-shadow:0 12px 32px rgba(0,0,0,.18)}
 .req-pop h3{margin:0;font:700 15px var(--font-display);display:flex;justify-content:space-between;align-items:center}
@@ -253,7 +273,6 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
         <label for="baseDate">기준일</label>
         <input type="date" id="baseDate">
-        <span class="chip" id="seasonChip">가을</span>
       </div>
       <div class="badges req-anchor">
         <button class="badge alert" id="reqTop" data-action="req-pop" aria-expanded="false" aria-controls="reqPop" hidden>새 요청 0건</button>
@@ -281,19 +300,23 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
         <form class="form" id="filterForm" autocomplete="off">
           <div class="field"><label for="fName">품목명</label><input class="input" id="fName" list="dlName" placeholder="전체 (예: PP 수지)"></div>
           <div class="field"><label for="fSupplier">납품회사</label><input class="input" id="fSupplier" list="dlSupplier" placeholder="전체"></div>
-          <div class="field"><label for="fSizeNum">치수</label>
-            <div class="size-row"><input class="input" id="fSizeNum" list="dlSizeNum" inputmode="decimal" placeholder="전체 (숫자)"><input class="input" id="fSizeUnit" list="dlSizeUnit" placeholder="단위" aria-label="치수 단위"></div>
+          <div class="field"><label for="fSizeNum">단위</label>
+            <div class="size-row"><input class="input" id="fSizeNum" list="dlSizeNum" inputmode="decimal" placeholder="전체 (숫자)"><select class="input" id="fSizeUnit" aria-label="단위 선택"></select></div>
           </div>
           <div class="field"><label for="fSpec">규격</label><input class="input" id="fSpec" list="dlSpec" placeholder="전체"></div>
-          <div class="field"><label for="fSeason">계절</label><input class="input" id="fSeason" list="dlSeason" placeholder="전체"></div>
+          <div class="field"><label for="fCategory">자재 분류</label><input class="input" id="fCategory" list="dlCategory" placeholder="전체 (예: 수지)"></div>
           <div class="field"><label for="fStatus">품질 상태</label><input class="input" id="fStatus" list="dlStatus" placeholder="전체 (정상·보류·불량·기한 만료)"></div>
           <div class="field"><label for="fDate">입고일 <small>(이 날짜 이후, 선택)</small></label><input class="input" type="date" id="fDate"></div>
           <div class="field">
             <label for="homeFile">엑셀 파일 업로드</label>
+            <div class="seg wide" role="group" aria-label="업로드 종류">
+              <button type="button" data-upkind="in" aria-pressed="true">입고 엑셀</button>
+              <button type="button" data-upkind="out" aria-pressed="false">출고 엑셀</button>
+            </div>
             <div class="drop" id="homeDrop" tabindex="0" role="button" aria-label="엑셀 파일 올리기">
               <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8"/><path d="M12 12v8M9 15l3-3 3 3"/></svg>
-              엑셀 파일을 끌어다 놓거나 눌러서 올려 주세요.
-              <small>(XLSX, XLS, CSV · 첫 줄에 품목명, 수량 등 열 이름)</small>
+              <span id="dropText">입고 엑셀을 끌어다 놓거나 눌러서 올려 주세요.</span>
+              <small id="dropHint">(XLSX, XLS, CSV · 첫 줄에 품목명, 수량 등 열 이름)</small>
             </div>
             <input type="file" id="homeFile" accept=".xlsx,.xls,.csv" hidden>
           </div>
@@ -310,25 +333,6 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
           </div>
         </div>
 
-        <!-- 엑셀 미리보기 -->
-        <div class="detail" id="preview" hidden>
-          <div class="table-head">
-            <h3 class="sec-title"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8"/><path d="M12 12v8M9 15l3-3 3 3"/></svg>엑셀 미리보기</h3>
-            <button class="linkbtn" id="importCancel">취소</button>
-          </div>
-          <p class="note" id="previewInfo"></p>
-          <div class="busy" id="importBusy" hidden></div>
-          <div class="table-wrap">
-            <table class="grid">
-              <thead><tr><th>확인</th><th>품목명</th><th>납품회사</th><th>규격</th><th>치수</th><th class="num">수량</th><th class="num">전산재고</th><th>품질 상태</th><th>사용기한</th><th>계절</th><th>기후</th><th>분류 근거</th></tr></thead>
-              <tbody id="previewRows"></tbody>
-            </table>
-          </div>
-          <div class="actions">
-            <button class="btn primary" id="importSave">저장하기</button>
-            <label class="check" id="dupWrap" hidden><input type="checkbox" id="importDup">중복으로 표시된 줄도 저장</label>
-          </div>
-        </div>
 
         <div class="stats">
           <button class="stat" data-detail="total">
@@ -387,12 +391,12 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
             <div class="field"><label for="iCode">품목코드 <small>(선택)</small></label><input class="input" id="iCode" placeholder="예: RM-PP-001"></div>
           </div>
           <div class="row2">
-            <div class="field"><label for="iSupplier">납품회사</label><input class="input" id="iSupplier" list="dlSupplier" placeholder="예: 다온유화"></div>
+            <div class="field"><label for="iSupplier">납품회사 <small>(목록에서 고르거나 직접 입력)</small></label><input class="input" id="iSupplier" list="dlSupplier" placeholder="예: 다온유화"></div>
             <div class="field"><label for="iLoc">보관 위치</label><input class="input" id="iLoc" placeholder="예: 원료창고 A-01"></div>
           </div>
           <div class="row2">
-            <div class="field"><label for="iSizeNum">치수 <small>(1개당)</small></label>
-              <div class="size-row"><input class="input" id="iSizeNum" type="number" min="0" step="any" placeholder="예: 25"><select class="input" id="iSizeUnit" aria-label="치수 단위"></select></div>
+            <div class="field"><label for="iSizeNum">단위 <small>(1개당 용량)</small></label>
+              <div class="size-row"><input class="input" id="iSizeNum" type="number" min="0" step="any" placeholder="예: 25"><select class="input" id="iSizeUnit" aria-label="단위 선택"></select></div>
             </div>
             <div class="field"><label for="iSpec">규격 <small>[표준 기호, 재질 부호, 형번(모델명) 등으로 기입]</small></label><input class="input" id="iSpec" placeholder="예: SUS304 25A"></div>
           </div>
@@ -411,8 +415,8 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
             <div class="field"><label for="iExp">사용기한 <small>(선택)</small></label><input class="input" id="iExp" type="date"></div>
           </div>
           <div class="row2">
-            <div class="field"><label for="iSeason">계절</label><select class="input" id="iSeason"></select></div>
-            <div class="field"><label for="iClimate">기후</label><select class="input" id="iClimate"></select></div>
+            <div class="field"><label for="iCategory">자재 분류</label><select class="input" id="iCategory"></select></div>
+            <div class="field"><label for="iClimate">기후/환경 조건</label><select class="input" id="iClimate"></select></div>
           </div>
           <button class="btn primary block" type="submit" id="itemSave">입고 저장하기</button>
           <div class="busy" id="itemBusy" hidden></div>
@@ -488,7 +492,7 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
           <div class="field"><label for="eName">품목명</label><input class="input" id="eName" required></div>
           <div class="field"><label for="eCode">품목코드</label><input class="input" id="eCode"></div>
           <div class="field"><label for="eSupplier">납품회사</label><input class="input" id="eSupplier" list="dlSupplier"></div>
-          <div class="field"><label for="eSizeNum">치수 <small>(1개당)</small></label><div class="size-row"><input class="input" id="eSizeNum" type="number" min="0" step="any"><select class="input" id="eSizeUnit" aria-label="치수 단위"></select></div></div>
+          <div class="field"><label for="eSizeNum">단위 <small>(1개당 용량)</small></label><div class="size-row"><input class="input" id="eSizeNum" type="number" min="0" step="any"><select class="input" id="eSizeUnit" aria-label="단위 선택"></select></div></div>
           <div class="field"><label for="eSpec">규격 <small>[표준 기호, 재질 부호, 형번(모델명) 등]</small></label><input class="input" id="eSpec" placeholder="예: SUS304 25A"></div>
           <div class="field"><label for="eQty">실물 수량</label><div class="size-row"><input class="input" id="eQty" type="number" min="0" step="any" required><select class="input" id="eQtyUnit" aria-label="수량 단위"></select></div></div>
           <div class="field"><label for="eErp">전산재고</label><input class="input" id="eErp" type="number" min="0" step="any"></div>
@@ -497,8 +501,8 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
           <div class="field"><label for="eDate">입고일</label><input class="input" id="eDate" type="date"></div>
           <div class="field"><label for="eExp">사용기한</label><input class="input" id="eExp" type="date"></div>
           <div class="field"><label for="eLoc">보관 위치</label><input class="input" id="eLoc"></div>
-          <div class="field"><label for="eSeason">계절</label><select class="input" id="eSeason"></select></div>
-          <div class="field"><label for="eClimate">기후</label><select class="input" id="eClimate"></select></div>
+          <div class="field"><label for="eCategory">자재 분류</label><select class="input" id="eCategory"></select></div>
+          <div class="field"><label for="eClimate">기후/환경 조건</label><select class="input" id="eClimate"></select></div>
           <div class="actions"><button class="btn primary" type="submit">수정 저장하기</button><button class="btn" type="button" id="editCancel2">취소</button></div>
         </form>
       </section>
@@ -522,7 +526,7 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
 
       <section class="panel card">
         <h2 class="sec-title"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>입출고 · 변경 기록</h2>
-        <p class="sub">누가 언제 입고·출고·수정·삭제했는지 최근 기록을 보여 줘요. 출고 기록은 계절 배율 계산에도 쓰여요.</p>
+        <p class="sub">누가 언제 입고·출고·수정·삭제했는지 최근 기록을 보여 줘요.</p>
         <div class="table-wrap" style="margin-top:16px">
           <table class="grid"><thead id="moveHead"></thead><tbody id="moveRows"></tbody></table>
         </div>
@@ -532,15 +536,11 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
     <!-- 설정 -->
     <section class="view" id="view-settings" hidden>
       <section class="panel card">
-        <h2 class="sec-title"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>안전재고 자동 조정 기준</h2>
-        <p class="sub">품목에 출고 기록이 6개월 이상 쌓이면, 기준일 계절의 실제 월평균 출고량으로 배율을 계산해요. 기록이 부족할 때만 아래 기본 배율을 써요.</p>
+        <h2 class="sec-title"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>재고 판정·발주 기준</h2>
+        <p class="sub">사용 가능 재고가 품목의 안전재고보다 적으면 부족으로 판정하고 발주량을 추천해요.</p>
         <form class="form" id="settingsForm">
           <div class="row2">
-            <div class="field"><label for="sSeason">기본 성수기 배율</label><input class="input" id="sSeason" type="number" min="1" step="0.1"><p class="note">출고 기록이 부족한 품목의 성수기에만 적용</p></div>
-            <div class="field"><label for="sClimate">기후 주의 배율</label><input class="input" id="sClimate" type="number" min="1" step="0.1"><p class="note">여름의 고온·습기 주의, 겨울의 저온 주의 품목 (보관 중 손실 대비)</p></div>
-          </div>
-          <div class="row2">
-            <div class="field"><label for="sBuffer">발주 여유율</label><input class="input" id="sBuffer" type="number" min="1" step="0.1"><p class="note">조정 안전재고의 몇 배까지 채울지</p></div>
+            <div class="field"><label for="sBuffer">발주 여유율</label><input class="input" id="sBuffer" type="number" min="1" step="0.1"><p class="note">안전재고의 몇 배까지 채울지</p></div>
             <div class="field"><label for="sStep">발주 단위 <small>(품목 수량 단위)</small></label><input class="input" id="sStep" type="number" min="1" step="1"></div>
           </div>
           <div class="row2">
@@ -549,6 +549,15 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
           </div>
           <div class="actions"><button class="btn primary" type="submit">기준 저장하기</button></div>
         </form>
+      </section>
+      <section class="panel card kv">
+        <h2 class="sec-title">납품회사 목록</h2>
+        <p class="sub">자주 쓰는 납품회사를 등록해 두면 입고 입력과 엑셀 업로드에서 목록으로 골라 쓸 수 있어요. 목록에 없는 회사도 언제든 직접 입력할 수 있어요.</p>
+        <form class="actions" id="supplierForm" autocomplete="off">
+          <input class="input" id="supplierName" placeholder="예: 다온유화" style="max-width:280px" aria-label="추가할 납품회사">
+          <button class="btn primary" type="submit">추가</button>
+        </form>
+        <div class="chips" id="supplierChips"></div>
       </section>
       <section class="panel card kv">
         <h2 class="sec-title">데이터와 연결 상태</h2>
@@ -564,11 +573,42 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
   </main>
 </div>
 <datalist id="dlName"></datalist><datalist id="dlSupplier"></datalist><datalist id="dlSizeNum"></datalist><datalist id="dlSizeUnit"></datalist>
-<datalist id="dlSpec"></datalist><datalist id="dlSeason"></datalist><datalist id="dlStatus"></datalist><datalist id="dlTeam"></datalist>
+<datalist id="dlSpec"></datalist><datalist id="dlCategory"></datalist><datalist id="dlStatus"></datalist><datalist id="dlTeam"></datalist>
+<!-- 엑셀 업로드 창 -->
+<div class="modal-back" id="preview" hidden>
+  <div class="modal card" role="dialog" aria-modal="true" aria-labelledby="upTitle">
+    <div class="table-head">
+      <h3 class="sec-title" id="upTitle"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8"/><path d="M12 12v8M9 15l3-3 3 3"/></svg><span id="upTitleText">엑셀 업로드</span></h3>
+      <div class="actions">
+        <button class="btn sm" id="pdfBtn"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 13h6M9 17h4"/></svg>PDF로 저장</button>
+        <button class="btn sm" id="importCancel">닫기</button>
+      </div>
+    </div>
+    <p class="note" id="previewInfo"></p>
+    <div class="busy" id="importBusy" hidden></div>
+    <div class="bulk-row" id="bulkRow">
+      <label for="bulkSupplier">납품회사 일괄 지정</label>
+      <input class="input" id="bulkSupplier" list="dlSupplier" placeholder="회사 이름 (목록에서 고르거나 직접 입력)">
+      <button class="btn sm" type="button" id="bulkEmpty">빈 칸에만 적용</button>
+      <button class="btn sm" type="button" id="bulkAll">전체에 적용</button>
+    </div>
+    <div class="table-wrap modal-table" id="upTableWrap">
+      <table class="grid"><thead id="previewHead"></thead><tbody id="previewRows"></tbody></table>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="importSave">저장하기</button>
+      <label class="check" id="dupWrap" hidden><input type="checkbox" id="importDup">중복으로 표시된 줄도 저장</label>
+    </div>
+  </div>
+</div>
+<!-- PDF를 만들 때만 잠깐 쓰는 영역 (화면 밖) -->
+<div id="pdfStage" class="pdf-stage" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 (() => {
 'use strict';
@@ -579,25 +619,43 @@ const SUPABASE_URL = 'https://jnaqceotoqrpshmnbiqn.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_xljUpMpJN8_hIDvYwI5y3A_cquilbBG';
 const LKEY = { items: 'inv.items.v1', requests: 'inv.requests.v1', chats: 'inv.chats.v1', moves: 'inv.moves.v1' };
 const KEY_SET = 'inv.settings.v1', KEY_ME = 'inv.me.v1';
-const DEFAULTS = { seasonFactor: 1.5, climateFactor: 1.3, orderBuffer: 1.2, orderStep: 1, defaultSafety: null, expSoonDays: 30 };
-const SEASONS = ['봄', '여름', '가을', '겨울', '사계절'];
-const CLIMATES = ['고온 주의', '습기 주의', '저온 주의', '일반'];
+const DEFAULTS = { orderBuffer: 1.2, orderStep: 1, defaultSafety: null, expSoonDays: 30, suppliers: [] };
+/* 자재 분류: PP·PA·ABS 수지처럼 세부 재질이 달라도 큰 분류(수지)로 묶는다 */
+const CATEGORIES = ['수지', '첨가제·충전제', '화학원료', '윤활·유류', '접착·도료', '포장재', '부품·공구', '소모품', '기타'];
+const CLIMATES = ['고온 주의', '저온 주의', '고습 주의', '저습 주의', '일반'];
 const STATUSES = ['정상', '보류', '불량'];
-const SIZE_UNITS = ['kg', 'g', 'L', 'mL', 'mm', 'cm', 'm', '개'];
+const SIZE_UNITS = ['kg', 'g', 'L', 'mL', 'mm', 'cm', 'm'];
 const QTY_UNITS = ['개', '포대', '드럼', '캔', '박스', '롤', 'kg', 'L'];
 const TEAMS = ['생산1팀', '생산2팀', '품질팀', '설비팀', '물류팀', '구매팀', '생산관리팀'];
 const LATE_MIN = 15;
 const FIELDS = ['code','name','supplier','size','spec','qty','qtyUnit','inDate','expDate','location','status','erpQty','safety',
-  'season','climate','seasonSrc','climateSrc','reason','classifiedBy','example','createdAt','updatedAt'];
+  'category','climate','categorySrc','climateSrc','reason','classifiedBy','example','createdAt','updatedAt'];
 const EXAMPLES = [
-  { code:'EX-PP-200', name:'폴리프로필렌 수지', supplier:'A사', spec:'200', size:'25kg', qty:6, qtyUnit:'포대', erpQty:6, safety:5, status:'정상', season:'여름', climate:'고온 주의', inDate:'2026-09-22', location:'A동 1열' },
-  { code:'EX-EP-150', name:'에폭시 수지', supplier:'B사', spec:'150', size:'20kg', qty:6, qtyUnit:'캔', erpQty:8, safety:5, status:'정상', season:'사계절', climate:'저온 주의', inDate:'2026-09-18', expDate:'2027-03-18', location:'A동 2열' },
-  { code:'EX-EP-150', name:'에폭시 수지', supplier:'B사', spec:'150', size:'20kg', qty:2, qtyUnit:'캔', erpQty:2, status:'불량', season:'사계절', climate:'저온 주의', inDate:'2026-08-30', location:'격리 구역' },
-  { code:'EX-UR-080', name:'우레탄 원료', supplier:'C사', spec:'80', size:'10kg', qty:8, qtyUnit:'캔', erpQty:8, safety:6, status:'보류', season:'여름', climate:'습기 주의', inDate:'2026-09-25', expDate:'2026-10-20', location:'B동 1열' },
-  { code:'EX-SI-120', name:'실리콘 오일', supplier:'A사', spec:'120', size:'5kg', qty:20, qtyUnit:'캔', erpQty:20, safety:10, status:'정상', season:'사계절', climate:'고온 주의', inDate:'2026-09-10', location:'B동 3열' },
-  { code:'EX-CB-060', name:'카본 블랙', supplier:'B사', spec:'60', size:'25kg', qty:2, qtyUnit:'포대', erpQty:4, safety:3, status:'정상', season:'겨울', climate:'습기 주의', inDate:'2026-09-02', location:'C동 1열' },
-  { code:'EX-SY-040', name:'합성수지 Y', supplier:'C사', spec:'40', size:'10kg', qty:4, qtyUnit:'포대', erpQty:4, safety:3, status:'정상', season:'여름', climate:'일반', inDate:'2026-09-28', location:'C동 2열' },
+  { code:'EX-PP-200', name:'폴리프로필렌 수지', supplier:'A사', spec:'200', size:'25kg', qty:6, qtyUnit:'포대', erpQty:6, safety:5, status:'정상', category:'수지', climate:'고온 주의', inDate:'2026-09-22', location:'A동 1열' },
+  { code:'EX-EP-150', name:'에폭시 수지', supplier:'B사', spec:'150', size:'20kg', qty:6, qtyUnit:'캔', erpQty:8, safety:5, status:'정상', category:'수지', climate:'저온 주의', inDate:'2026-09-18', expDate:'2027-03-18', location:'A동 2열' },
+  { code:'EX-EP-150', name:'에폭시 수지', supplier:'B사', spec:'150', size:'20kg', qty:2, qtyUnit:'캔', erpQty:2, status:'불량', category:'수지', climate:'저온 주의', inDate:'2026-08-30', location:'격리 구역' },
+  { code:'EX-UR-080', name:'우레탄 원료', supplier:'C사', spec:'80', size:'10kg', qty:8, qtyUnit:'캔', erpQty:8, safety:6, status:'보류', category:'화학원료', climate:'고습 주의', inDate:'2026-09-25', expDate:'2026-10-20', location:'B동 1열' },
+  { code:'EX-SI-120', name:'실리콘 오일', supplier:'A사', spec:'120', size:'5kg', qty:20, qtyUnit:'캔', erpQty:20, safety:10, status:'정상', category:'윤활·유류', climate:'고온 주의', inDate:'2026-09-10', location:'B동 3열' },
+  { code:'EX-CB-060', name:'카본 블랙', supplier:'B사', spec:'60', size:'25kg', qty:2, qtyUnit:'포대', erpQty:4, safety:3, status:'정상', category:'첨가제·충전제', climate:'고습 주의', inDate:'2026-09-02', location:'C동 1열' },
+  { code:'EX-SY-040', name:'합성수지 Y', supplier:'C사', spec:'40', size:'10kg', qty:4, qtyUnit:'포대', erpQty:4, safety:3, status:'정상', category:'수지', climate:'일반', inDate:'2026-09-28', location:'C동 2열' },
 ].map(e => ({ ...e, reason:'예시 데이터', classifiedBy:'예시', example:true }));
+/* 예전 데이터의 기후 값('습기 주의')을 새 이름으로 맞춘다 */
+function normClimate(v) {
+  const t = String(v ?? '').replace(/\s/g, '');
+  if (!t) return null;
+  if (/저습|건조/.test(t)) return '저습 주의';
+  if (/고습|습기|습도|흡습|다습/.test(t)) return '고습 주의';
+  if (/고온|열/.test(t)) return '고온 주의';
+  if (/저온|동결|결빙|추위/.test(t)) return '저온 주의';
+  if (/일반|없음|상온/.test(t)) return '일반';
+  return null;
+}
+const climateOf = it => normClimate(it.climate);
+function normCategory(v) {
+  const t = String(v ?? '').replace(/\s/g, '');
+  if (!t) return null;
+  return CATEGORIES.find(c => c.replace(/·/g, '') === t.replace(/[·/,]/g, '')) || CATEGORIES.find(c => c.split('·').some(w => t.includes(w))) || null;
+}
 const PERMANENT_AI_ERRORS = ['not_granted','sampling_disabled','not_declared','capability_disabled','capability_removed'];
 const JUDGE_RANK = { short: 0, hold: 1, ok: 2, none: 3 };
 
@@ -610,6 +668,7 @@ const state = {
   entryMode: 'in', outReqId: null, editId: null,
   reqType: '재고 요청', reqFilter: 'all', openReqs: new Set(),
   me: { team: '', name: '' },
+  upKind: 'in', pendingKind: 'in',
   sort: { home: { key: 'name', dir: 'asc' }, list: { key: 'name', dir: 'asc' }, moves: { key: 'at', dir: 'desc' },
           short: { key: 'judge', dir: 'asc' }, diff: { key: 'name', dir: 'asc' }, blocked: { key: 'name', dir: 'asc' },
           dtotal: { key: 'total', dir: 'desc' }, dusable: { key: 'usable', dir: 'desc' } },
@@ -693,9 +752,9 @@ function headHtml(id, cols) {
     return `<th${cls} aria-sort="${aria}"><button class="th-sort" type="button" data-sort="${id}" data-key="${c.key}" title="눌러서 정렬">${c.label}<span class="arr">${on ? (s.dir === 'asc' ? '▲' : '▼') : '↕'}</span></button></th>`;
   }).join('') + '</tr>';
 }
-function bodyHtml(id, cols, rows, after) {
-  // no 열은 정렬 순서와 상관없이 위에서부터 1, 2, 3…
-  return sortRows(id, rows, cols).map((r, i) => `<tr>${cols.map(c => c.no ? `<td class="row-no">${i + 1}</td>`
+function bodyHtml(id, cols, rows, after, start = 0) {
+  // no 열은 정렬 순서와 상관없이 위에서부터 1, 2, 3… (start부터 이어서)
+  return sortRows(id, rows, cols).map((r, i) => `<tr>${cols.map(c => c.no ? `<td class="row-no">${start + i + 1}</td>`
     : `<td${c.num ? ' class="num"' : ''}>${c.cell ? c.cell(r) : esc(r[c.key] ?? '-')}</td>`).join('')}</tr>${after ? after(r) : ''}`).join('');
 }
 function tableHtml(id, cols, rows, after) {
@@ -789,29 +848,43 @@ async function saveSettings(s) {
 }
 
 /* ───────── AI 분류 ───────── */
+/* 자재 분류 규칙: 위에서부터 먼저 맞는 분류를 쓴다 (예: '실리콘 오일'은 수지가 아니라 윤활·유류) */
+const CATEGORY_RULES = [
+  ['윤활·유류', /유압유|그리스|절삭유|오일|부동액|윤활|냉각수|연료|경유|등유/i],
+  ['접착·도료', /접착|실란트|본드|도료|페인트|이형제|방청|코팅|시너/i],
+  ['포장재', /박스|골판지|비닐|필름|실리카겔|제습제|포장|파렛트|팔레트|테이프|랩/i],
+  ['수지', /수지|레진|resin|펠릿|펠렛|그레이드|컴파운드|(^|[^A-Z])(PP|PE|HDPE|LDPE|ABS|PC|PA\d*|PET|PBT|POM|PS|PVC|PMMA|TPU|TPE|나일론)([^A-Z]|$)/i],
+  ['첨가제·충전제', /첨가제|안정제|산화방지|마스터배치|탈크|충전제|카본|안료|가소제|난연제|유리섬유/i],
+  ['화학원료', /원료|경화제|원액|염화칼슘|용제|촉매|모노머|이소시아네이트|폴리올/i],
+  ['부품·공구', /볼트|너트|와셔|O-?링|오링|베어링|용접봉|필터|공구|스프링|핀|씰|가스켓|호스/i],
+  ['소모품', /장갑|마스크|걸레|와이퍼|면장갑|보호구|건전지/i],
+];
+function ruleCategory(r) {
+  const t = `${r.name || ''} ${r.spec || ''}`;
+  for (const [c, re] of CATEGORY_RULES) if (re.test(t)) return c;
+  return '기타';
+}
 function ruleClassify(r) {
   const t = `${r.name || ''} ${r.spec || ''}`;
-  let climate = '일반', season = '사계절', reason = '기본 규칙: 특이 조건 없음';
-  if (/우레탄|이소시아네이트|카본|분말|파우더|안료|흡습|시멘트|석고|종이|펄프|골판지|PA|나일론|PC|탈크|용접봉/.test(t)) { climate = '습기 주의'; reason = '기본 규칙: 습기에 약한 원료'; }
-  else if (/에폭시|경화제|라텍스|에멀젼|수성|그리스|O-링|NBR/.test(t)) { climate = '저온 주의'; reason = '기본 규칙: 저온에서 굳거나 결정화'; }
+  let climate = '일반', reason = '기본 규칙: 특이 조건 없음';
+  if (/목재|합판|가죽|전자|PCB|정전기|IC|반도체|센서|배터리/.test(t)) { climate = '저습 주의'; reason = '기본 규칙: 건조하면 갈라지거나 정전기 위험'; }
+  else if (/우레탄|이소시아네이트|카본|분말|파우더|안료|흡습|시멘트|석고|종이|펄프|골판지|PA|나일론|PC|탈크|용접봉|실리카겔|염화칼슘/.test(t)) { climate = '고습 주의'; reason = '기본 규칙: 습기를 먹으면 굳거나 품질 저하'; }
+  else if (/에폭시|경화제|라텍스|에멀젼|수성|그리스|O-링|NBR|부동액/.test(t)) { climate = '저온 주의'; reason = '기본 규칙: 저온에서 굳거나 결정화'; }
   else if (/실리콘|오일|유압유|용제|시너|도료|페인트|왁스|접착|이형제|방청|필름/.test(t)) { climate = '고온 주의'; reason = '기본 규칙: 고온에서 변질·휘발'; }
-  if (/냉각|냉매|에어컨|선풍|자외선|UV|제습|실리카겔|아이스|방충|방청/.test(t)) season = '여름';
-  else if (/부동|히터|난방|보온|제설|염화칼슘|단열|방한/.test(t)) season = '겨울';
-  else if (/도료|페인트|비료|황사|필터/.test(t)) season = '봄';
-  else if (/추석|선물|김장|박스/.test(t)) season = '가을';
-  return { season, climate, reason, classifiedBy: '규칙' };
+  return { category: ruleCategory(r), climate, reason, classifiedBy: '규칙' };
 }
 function aiPrompt(rows) {
   return [
     '너는 제조업 생산관리팀의 재고 분류 담당자야. 아래 재고 품목마다 세 가지를 정해.',
-    '1) season: 이 품목의 수요나 사용량이 가장 늘어나는 계절. "봄", "여름", "가을", "겨울", "사계절" 중 하나.',
-    '   특정 계절에 수요가 몰릴 이유가 조금이라도 있으면 그 계절을 고르고, 1년 내내 고르게 쓰일 때만 "사계절"로 해.',
-    '2) climate: 창고에 보관할 때 가장 주의해야 할 기후 조건. "고온 주의", "습기 주의", "저온 주의", "일반" 중 하나.',
-    '3) reason: 그렇게 판단한 근거를 한국어 20자 이내로.',
-    '다른 말 없이 JSON 배열만 답해. 예: [{"i":0,"season":"여름","climate":"습기 주의","reason":"장마철 흡습으로 굳음"}]',
+    `1) category: 자재의 큰 분류. ${CATEGORIES.map(c => `"${c}"`).join(', ')} 중 하나.`,
+    '   PP 수지, PA 수지, ABS 수지처럼 재질만 다른 것은 세분하지 말고 모두 "수지"로 묶어.',
+    `2) climate: 창고에 보관할 때 가장 주의해야 할 기후/환경 조건. ${CLIMATES.map(c => `"${c}"`).join(', ')} 중 하나.`,
+    '   "고습 주의"는 습기를 먹으면 안 되는 것, "저습 주의"는 너무 건조하면 갈라지거나 정전기가 생기는 것.',
+    '3) reason: 기후/환경 조건을 그렇게 판단한 근거를 한국어 20자 이내로.',
+    '다른 말 없이 JSON 배열만 답해. 예: [{"i":0,"category":"수지","climate":"고습 주의","reason":"흡습하면 성형 불량"}]',
     '',
     '품목 목록(한 줄에 하나):',
-    ...rows.map((r, i) => JSON.stringify({ i, 품목명: r.name, 납품회사: r.supplier || '', 규격: r.spec || '', 치수: r.size || '' })),
+    ...rows.map((r, i) => JSON.stringify({ i, 품목명: r.name, 납품회사: r.supplier || '', 규격: r.spec || '', 단위: r.size || '' })),
   ].join('\n');
 }
 async function aiClassify(rows) {
@@ -824,18 +897,18 @@ async function aiClassify(rows) {
     chunk.forEach((_, j) => {
       const r = byI.get(j) || {};
       out.push({
-        season: SEASONS.includes(r.season) ? r.season : '사계절',
-        climate: CLIMATES.includes(r.climate) ? r.climate : '일반',
+        category: normCategory(r.category) || ruleCategory(chunk[j]),
+        climate: normClimate(r.climate) || '일반',
         reason: String(r.reason || 'AI 판단').slice(0, 40), classifiedBy: 'AI',
       });
     });
   }
   return out;
 }
-/* force=false면 계절·기후가 비어 있는 행만 분류한다. 사람이 적은 값(src === 'user')은 force여도 바꾸지 않는다. */
+/* force=false면 자재 분류·기후/환경이 비어 있는 행만 분류한다. 사람이 적은 값(src === 'user')은 force여도 바꾸지 않는다. */
 async function classifyRows(rows, force = false) {
   const idx = rows.map((r, i) => {
-    const needS = r.seasonSrc !== 'user' && (force || !r.season);
+    const needS = r.categorySrc !== 'user' && (force || !r.category);
     const needC = r.climateSrc !== 'user' && (force || !r.climate);
     return needS || needC ? i : -1;
   }).filter(i => i >= 0);
@@ -853,9 +926,9 @@ async function classifyRows(rows, force = false) {
   const out = rows.slice();
   idx.forEach((i, k) => {
     const r = results[k], src = rows[i];
-    const keepS = src.seasonSrc === 'user' || (!force && src.season);
+    const keepS = src.categorySrc === 'user' || (!force && src.category);
     const keepC = src.climateSrc === 'user' || (!force && src.climate);
-    out[i] = { ...src, season: keepS ? src.season : r.season, climate: keepC ? src.climate : r.climate, reason: r.reason, classifiedBy: r.classifiedBy };
+    out[i] = { ...src, category: keepS ? src.category : r.category, climate: keepC ? normClimate(src.climate) : r.climate, reason: r.reason, classifiedBy: r.classifiedBy };
   });
   return { rows: out, via };
 }
@@ -909,48 +982,12 @@ function expCell(it) {
   return `${esc(it.expDate)}${d < 0 ? '<span class="sub-cell bad-text">기한 지남</span>' : isSoon(it) ? `<span class="sub-cell warn-text">${d}일 남음</span>` : ''}`;
 }
 
-/* ───────── 계산: 품목별 재고 · 안전재고 조정 · 발주 추천 ───────── */
-function seasonOf(iso) {
-  const m = Number(String(iso || todayISO()).slice(5, 7));
-  if (m >= 3 && m <= 5) return '봄';
-  if (m >= 6 && m <= 8) return '여름';
-  if (m >= 9 && m <= 11) return '가을';
-  return '겨울';
-}
-/* 출고 기록이 6개월 이상이면 실제 계절별 월평균 출고량으로 배율을 계산한다 */
-function historyFactor(p, cur) {
-  const months = new Map();
-  for (const m of state.moves) {
-    if (m.type !== '출고' || !isNum(m.qty)) continue;
-    if (m.key ? m.key !== p.key : !(m.name === p.name && (m.spec || null) === (p.spec || null))) continue;
-    const ym = (m.date || todayISO(new Date(m.at || Date.now()))).slice(0, 7);
-    months.set(ym, (months.get(ym) || 0) + Number(m.qty));
-  }
-  if (months.size < 6) return { months: months.size };
-  const all = [...months.entries()];
-  const inSeason = all.filter(([ym]) => seasonOf(ym + '-15') === cur);
-  if (!inSeason.length) return { months: months.size };
-  const avg = a => a.reduce((s, [, v]) => s + v, 0) / a.length;
-  const f = Math.min(3, Math.max(0.5, avg(inSeason) / avg(all)));
-  return { months: months.size, f: Math.round(f * 100) / 100 };
-}
-function factorFor(p, cur, s) {
-  let f = 1; const why = [];
-  const h = historyFactor(p, cur);
-  let basis;
-  if (h.f) { f *= h.f; why.push(`출고 기록 ${h.months}개월 기준 ${cur} ×${h.f}`); basis = '출고 기록'; }
-  else {
-    const peak = p.season === cur || (p.season === '봄·가을' && (cur === '봄' || cur === '가을'));
-    if (peak) { f *= s.seasonFactor; why.push(`성수기 기본 배율 ×${s.seasonFactor}`); }
-    basis = h.months ? `기본 배율 (출고 기록 ${h.months}개월뿐)` : '기본 배율 (출고 기록 없음)';
-  }
-  const risk = ((p.climate === '고온 주의' || p.climate === '습기 주의') && cur === '여름') || (p.climate === '저온 주의' && cur === '겨울');
-  if (risk) { f *= s.climateFactor; why.push(`${p.climate} ×${s.climateFactor}`); }
-  return { f, why, basis };
-}
+/* ───────── 계산: 품목별 재고 · 안전재고 판정 · 발주 추천 ───────── */
+/* 자재 분류가 없는 예전 데이터는 규칙으로 바로 분류해서 보여 준다 */
+const categoryOf = it => normCategory(it.category) || ruleCategory(it);
 function analyze() {
   rebuildCodeMap();
-  const s = state.settings, cur = seasonOf(state.baseDate);
+  const s = state.settings;
   const map = new Map();
   // 안전재고는 품목의 기준이므로, 기준일에 빠지는 입고분에 적혀 있어도 그대로 쓴다
   const safetyByKey = new Map();
@@ -963,16 +1000,17 @@ function analyze() {
     let p = map.get(k);
     if (!p) {
       p = { key: k, code: it.code || state.codeMap.get(nsKey(it)) || null, name: it.name, spec: it.spec, supplier: it.supplier, size: it.size,
-        unit: unitOf(it), season: null, climate: null, seasonUser: false, ai: false, lots: [],
+        unit: unitOf(it), category: null, catUser: false, climate: null, climateUser: false, ai: false, lots: [],
         total: 0, usable: 0, hold: 0, bad: 0, expired: 0, soon: 0, erp: 0, hasErp: false, safety: null,
         kgTotal: 0, kgUsable: 0, kgBlocked: 0, kgOk: true };
       map.set(k, p);
     }
     p.lots.push(it);
     p.safety = safetyByKey.get(k) ?? null;
-    // 같은 품목의 입고분끼리 계절이 다르면 사람이 적은 값을 우선한다
-    if (it.season && (!p.season || (it.seasonSrc === 'user' && !p.seasonUser))) { p.season = it.season; p.seasonUser = it.seasonSrc === 'user'; }
-    if (it.climate && (!p.climate || it.climateSrc === 'user')) p.climate = it.climate;
+    // 같은 품목의 입고분끼리 분류가 다르면 사람이 적은 값을 우선한다
+    if (!p.category || (it.categorySrc === 'user' && !p.catUser)) { p.category = categoryOf(it); p.catUser = it.categorySrc === 'user'; }
+    const cl = climateOf(it);
+    if (cl && (!p.climate || (it.climateSrc === 'user' && !p.climateUser))) { p.climate = cl; p.climateUser = it.climateSrc === 'user'; }
     if (it.classifiedBy === 'AI') p.ai = true;
     if (!p.supplier && it.supplier) p.supplier = it.supplier;
     const q = Number(it.qty) || 0, kp = kgPer(it);
@@ -986,29 +1024,25 @@ function analyze() {
   const products = [...map.values()].map(p => {
     const base = p.safety ?? s.defaultSafety ?? null;
     const judged = base !== null && base > 0;
-    const fx = factorFor(p, cur, s);
-    const adj = judged ? Math.ceil(base * fx.f) : null;
+    const adj = judged ? base : null;
     // 충분: 사용 가능 ≥ 기준 / 보류 확인: 보류분이 풀리면 기준을 넘음 / 부족: 보류분까지 더해도 모자람
     const judge = !judged ? 'none' : p.usable >= adj ? 'ok' : p.usable + p.hold >= adj ? 'hold' : 'short';
     const step = s.orderStep || 1;
     const order = judge === 'short' || judge === 'hold' ? Math.max(step, Math.ceil((adj * s.orderBuffer - p.usable) / step) * step) : 0;
     const blocked = p.hold + p.bad;
-    return { ...p, base, judged, f: fx.f, why: fx.why, basis: fx.basis, adj, judge, order, blocked,
+    return { ...p, base, judged, adj, judge, order, blocked,
       physGap: p.hasErp ? p.total - p.erp : 0, useGap: p.hasErp ? p.usable - p.erp : 0 };
   });
-  return { products, byKey: new Map(products.map(p => [p.key, p])), cur };
+  return { products, byKey: new Map(products.map(p => [p.key, p])) };
 }
 const hit = (v, q) => !q || String(v ?? '').toLowerCase().includes(q.toLowerCase());
-/* 계절 필터: 봄·여름·가을·겨울을 고르면 그 계절 품목과 1년 내내 쓰는 사계절 품목을 함께 보여 준다 */
-const seasonHit = (v, q) => !q || (['봄', '여름', '가을', '겨울'].includes(q.trim()) ? (v === q.trim() || v === '사계절' || (v === '봄·가을' && /봄|가을/.test(q))) : hit(v, q));
-function applySeasonByDate() { const s = seasonOf(state.baseDate); $('#fSeason').value = s; state.filters.season = s; }
 function lotMatches(it) {
   const f = state.filters;
   const sz = parseSize(it.size);
   const st = { ok: '정상', hold: '보류', bad: '불량', expired: '기한 만료', future: '입고 전' }[lotState(it)];
   const sizeOk = !f.sizeNum || (num(f.sizeNum) !== null && /^[\d.,\s]+$/.test(f.sizeNum) ? sz.n === num(f.sizeNum) : hit(it.size, f.sizeNum));
-  return hit(it.name, f.name) && hit(it.supplier, f.supplier) && sizeOk && (!f.sizeUnit || hit(sz.u, f.sizeUnit)) &&
-    hit(it.spec, f.spec) && seasonHit(it.season, f.season) && (!f.status || hit(st, f.status) || hit(it.status, f.status)) &&
+  return hit(it.name, f.name) && hit(it.supplier, f.supplier) && sizeOk && (!f.sizeUnit || sz.u === f.sizeUnit) &&
+    hit(it.spec, f.spec) && hit(categoryOf(it), f.category) && (!f.status || hit(st, f.status) || hit(it.status, f.status)) &&
     (!f.date || (it.inDate || '') >= f.date) && (!f.code || hit(it.code, f.code));
 }
 /* 판정은 항상 품목 전체 입고분으로 하고, 필터는 어떤 품목을 보여 줄지만 정한다 */
@@ -1022,10 +1056,10 @@ function productsByName(name, unit) {
 }
 
 /* ───────── 화면: 공통 ───────── */
-const seasonTag = x => x.seasonUser || x.seasonSrc === 'user' ? '<span class="tag">입력</span>' : (x.ai || x.classifiedBy === 'AI') ? '<span class="tag ai">AI</span>' : x.classifiedBy ? `<span class="tag">${esc(x.classifiedBy)}</span>` : '';
+/* 기후/환경 조건을 누가 정했는지 표시: 사람이 입력 / AI / 기본 규칙 */
+const srcTag = x => x.climateUser || x.climateSrc === 'user' ? '<span class="tag">입력</span>' : (x.ai || x.classifiedBy === 'AI') ? '<span class="tag ai">AI</span>' : x.classifiedBy ? `<span class="tag">${esc(x.classifiedBy)}</span>` : '';
 const kgSub = (kg, ok) => kg > 0 ? `<span class="sub-cell">${ok ? '' : '일부 '}≈ ${fmt(Math.round(kg))} kg</span>` : '';
 function renderHeader() {
-  $('#seasonChip').textContent = `${seasonOf(state.baseDate)} 기준`;
   $('#roBanner').hidden = state.canWrite || state.mode === 'connecting';
   const n = state.requests.filter(r => r.status === 'new').length;
   $('#reqTop').hidden = !n; $('#reqTop').textContent = `새 요청 ${n}건`;
@@ -1056,18 +1090,14 @@ const distinct = field => [...new Set(state.items.map(i => i[field]).filter(Bool
 const opts = values => values.map(v => `<option value="${esc(v)}">`).join('');
 function renderLists() {
   $('#dlName').innerHTML = opts(distinct('name'));
-  $('#dlSupplier').innerHTML = opts(distinct('supplier'));
-  // 치수: 단위 칸에 적은 단위의 숫자만 오름차순으로 보여 준다
-  const sizes = state.items.map(i => parseSize(i.size)).filter(s => s.u || s.n !== null);
-  const units = [...new Set(sizes.map(s => s.u).filter(Boolean))].sort((a, b) => {
-    const ia = SIZE_UNITS.indexOf(a), ib = SIZE_UNITS.indexOf(b);
-    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, 'ko');
-  });
-  $('#dlSizeUnit').innerHTML = opts(units);
-  const unit = $('#fSizeUnit').value.trim();
-  $('#dlSizeNum').innerHTML = opts([...new Set(sizes.filter(s => s.n !== null && (!unit || s.u === unit)).map(s => s.n))].sort((a, b) => a - b).map(String));
+  // 납품회사: 설정에 등록한 목록 + 지금까지 입력된 회사
+  $('#dlSupplier').innerHTML = opts([...new Set([...(state.settings.suppliers || []), ...distinct('supplier')])]);
+  // 단위: 오른쪽에서 고른 단위의 숫자만 왼쪽 목록에 오름차순으로 보여 준다
+  const sizes = state.items.map(i => parseSize(i.size)).filter(s => s.n !== null);
+  const unit = $('#fSizeUnit').value;
+  $('#dlSizeNum').innerHTML = opts([...new Set(sizes.filter(s => !unit || s.u === unit).map(s => s.n))].sort((a, b) => a - b).map(String));
   $('#dlSpec').innerHTML = opts(distinct('spec'));
-  $('#dlSeason').innerHTML = opts(SEASONS);
+  $('#dlCategory').innerHTML = opts(CATEGORIES);
   $('#dlStatus').innerHTML = opts([...STATUSES, '기한 만료']);
   $('#dlTeam').innerHTML = opts([...new Set([...TEAMS, ...state.requests.map(r => r.team).filter(Boolean)])]);
   $('#filterReset').hidden = !Object.values(state.filters).some(Boolean);
@@ -1083,7 +1113,7 @@ function qualityPills(p) {
 function judgeCell(p) {
   const u = p.unit;
   if (p.judge === 'none') return '<span class="status s-none">기준 없음</span><span class="sub-cell">안전재고 미입력</span>';
-  if (p.judge === 'ok') return `<span class="status s-ok">충분</span><span class="sub-cell" title="사용 가능 / 계절 조정 안전재고">${fmt(p.usable)} / ${fmtQ(p.adj, u)}</span>`;
+  if (p.judge === 'ok') return `<span class="status s-ok">충분</span><span class="sub-cell" title="사용 가능 / 안전재고">${fmt(p.usable)} / ${fmtQ(p.adj, u)}</span>`;
   if (p.judge === 'hold') return `<span class="status s-hold">보류 확인</span><span class="sub-cell">검사 후 판단</span>`;
   return `<span class="status s-bad">부족</span><span class="sub-cell">${fmt(p.usable)} / ${fmtQ(p.adj, u)}</span>`;
 }
@@ -1093,8 +1123,8 @@ const HOME_COLS = [
     const open = state.expanded.has(p.key);
     return `<button class="row-toggle" type="button" data-expand="${esc(p.key)}" aria-expanded="${open}" aria-label="${esc(p.name)} 입고분 ${open ? '접기' : '펼치기'}">${open ? '▾' : '▸'}</button>${esc(p.name)}<span class="sub-cell" style="padding-left:32px">${p.code ? esc(p.code) + ' · ' : ''}입고분 ${p.lots.length}건</span>`; } },
   { key: 'supplier', label: '납품회사', cell: p => esc(p.supplier || '-') },
-  { key: 'spec', label: '규격 · 치수', cell: p => `${esc(p.spec || '-')}<span class="sub-cell">${esc(p.size || '')}</span>` },
-  { key: 'season', label: '계절 · 기후', get: p => SEASONS.indexOf(p.season) < 0 ? null : SEASONS.indexOf(p.season), cell: p => `${esc(p.season || '-')}${seasonTag(p)}<span class="sub-cell">${esc(p.climate || '')}</span>` },
+  { key: 'spec', label: '규격 · 단위', cell: p => `${esc(p.spec || '-')}<span class="sub-cell">${esc(p.size || '')}</span>` },
+  { key: 'climate', label: '기후/환경 조건', get: p => CLIMATES.indexOf(p.climate) < 0 ? null : CLIMATES.indexOf(p.climate), cell: p => `${esc(p.climate || '-')}${srcTag(p)}` },
   { key: 'total', label: '보유 수량', num: true, cell: p => `${fmtQ(p.total, p.unit)}${p.expired ? `<span class="sub-cell bad-text">기한 만료 ${fmtQ(p.expired, p.unit)} 제외</span>` : kgSub(p.kgTotal, p.kgOk)}` },
   { key: 'usable', label: '사용 가능', num: true, cell: p => `<b>${fmtQ(p.usable, p.unit)}</b>${p.soon ? `<span class="sub-cell warn-text">기한 임박 ${fmtQ(p.soon, p.unit)}</span>` : kgSub(p.kgUsable, p.kgOk)}` },
   { key: 'quality', label: '품질 상태 · 사용 불가', get: p => qualityRank(p) * 1e9 - p.blocked, cell: p => `${qualityPills(p)}${p.blocked ? `<span class="sub-cell">사용 불가 ${fmtQ(p.blocked, p.unit)}</span>` : ''}` },
@@ -1127,7 +1157,18 @@ function renderHome(a, shown) {
   else if (!state.items.length) body.innerHTML = `<tr><td colspan="${span}"><div class="empty"><b>아직 등록된 재고가 없어요.</b>왼쪽에서 엑셀 파일을 올리거나 입력 화면에서 직접 입력해 주세요.
       <div class="actions"><button class="btn primary sm" data-go="input">재고 입력하기</button><button class="btn sm" data-action="examples">예시 데이터 넣기</button></div></div></td></tr>`;
   else if (!shown.length) body.innerHTML = `<tr><td colspan="${span}"><div class="empty">조건에 맞는 재고가 없어요.<button class="linkbtn" data-action="reset-filter">조건 초기화</button></div></td></tr>`;
-  else body.innerHTML = bodyHtml('home', HOME_COLS, shown, lotsRow);
+  else {
+    // 자재 분류(수지·첨가제 등)별로 묶어서 보여 준다. 분류 안에서는 고른 정렬 기준을 따른다
+    let n = 0;
+    body.innerHTML = CATEGORIES.map(cat => {
+      const rows = shown.filter(p => p.category === cat);
+      if (!rows.length) return '';
+      const html = `<tr class="group"><td colspan="${span}">${esc(cat)}<small>${rows.length}개 품목 · 사용 가능 ${fmt(rows.reduce((s, p) => s + p.usable, 0))}개</small></td></tr>`
+        + bodyHtml('home', HOME_COLS, rows, lotsRow, n);
+      n += rows.length;
+      return html;
+    }).join('');
+  }
 
   const diffs = shown.filter(p => p.hasErp && Math.abs(p.useGap) > 1e-6);
   const phys = diffs.filter(p => Math.abs(p.physGap) > 1e-6).length;
@@ -1141,9 +1182,7 @@ const SHORT_COLS = [
   { key: 'judge', label: '판정', get: p => JUDGE_RANK[p.judge], cell: p => p.judge === 'hold' ? '<span class="status s-hold">보류 확인</span>' : '<span class="status s-bad">부족</span>' },
   { key: 'usable', label: '사용 가능', num: true, cell: p => `<span class="short-qty">${fmtQ(p.usable, p.unit)}</span>` },
   { key: 'hold', label: '보류 중', num: true, cell: p => p.hold ? fmtQ(p.hold, p.unit) : '-' },
-  { key: 'base', label: '기본 안전재고', num: true, cell: p => fmtQ(p.base, p.unit) },
-  { key: 'basis', label: '조정 근거', get: p => p.f, cell: p => `${p.why.length ? esc(p.why.join(', ')) : '조정 없음'}<span class="sub-cell">${esc(p.basis)}</span>` },
-  { key: 'adj', label: '조정 안전재고', num: true, cell: p => fmtQ(p.adj, p.unit) },
+  { key: 'adj', label: '안전재고', num: true, cell: p => fmtQ(p.adj, p.unit) },
   { key: 'order', label: '발주 추천', num: true, cell: p => `<b>${fmtQ(p.order, p.unit)}</b>${p.judge === 'hold' ? '<span class="sub-cell">보류가 안 풀리면</span>' : ''}${p.kgOk && kgPer(p.lots[0]) ? `<span class="sub-cell">≈ ${fmt(Math.round(p.order * kgPer(p.lots[0])))} kg</span>` : ''}` },
 ];
 const DIFF_COLS = [
@@ -1168,7 +1207,8 @@ const BLOCKED_COLS = [
 const STOCK_COLS = [
   { key: '_no', label: '#', sort: false, no: true },
   { key: 'name', label: '품목명', cell: p => `${esc(p.name)}<span class="sub-cell">${p.code ? esc(p.code) + ' · ' : ''}${esc(p.supplier || '')}</span>` },
-  { key: 'spec', label: '규격 · 치수', cell: p => `${esc(p.spec || '-')}<span class="sub-cell">${esc(p.size || '')}</span>` },
+  { key: 'category', label: '자재 분류', get: p => CATEGORIES.indexOf(p.category), cell: p => esc(p.category || '-') },
+  { key: 'spec', label: '규격 · 단위', cell: p => `${esc(p.spec || '-')}<span class="sub-cell">${esc(p.size || '')}</span>` },
   { key: 'location', label: '보관 위치', get: p => p.lots.map(l => l.location).filter(Boolean)[0] || null, cell: p => esc([...new Set(p.lots.map(l => l.location).filter(Boolean))].join(', ') || '-') },
   { key: 'total', label: '보유 수량', num: true, cell: p => fmtQ(p.total, p.unit) },
   { key: 'usable', label: '사용 가능', num: true, cell: p => `<b>${fmtQ(p.usable, p.unit)}</b>${p.soon ? `<span class="sub-cell warn-text">기한 임박 ${fmtQ(p.soon, p.unit)}</span>` : ''}` },
@@ -1191,7 +1231,7 @@ function renderDetail(a, shown) {
   } else if (state.detail === 'short') {
     const rows = shown.filter(p => p.judge === 'short' || p.judge === 'hold');
     head = `<div class="table-head"><h3 class="sec-title">부족 품목 · 발주 추천</h3>${close}</div>
-      <p class="note">기준일 ${esc(state.baseDate)} (${a.cur}) 기준이에요. '보류 확인'은 보류된 입고분이 검사를 통과하면 충분해지는 품목이라, 발주보다 검사를 먼저 확인하세요.</p>`;
+      <p class="note">기준일 ${esc(state.baseDate)} 기준이에요. '보류 확인'은 보류된 입고분이 검사를 통과하면 충분해지는 품목이라, 발주보다 검사를 먼저 확인하세요.</p>`;
     table = rows.length ? tableHtml('short', SHORT_COLS, rows) : `<div class="empty">지금 기준으로 부족한 품목이 없어요.</div>`;
   } else if (state.detail === 'diff') {
     const rows = shown.filter(p => p.hasErp && Math.abs(p.useGap) > 1e-6);
@@ -1214,25 +1254,91 @@ function markDuplicates(rows) {
   const existing = new Set(state.items.map(fingerprint)), seen = new Set();
   return rows.map(r => { const f = fingerprint(r); const dup = existing.has(f) ? 'saved' : seen.has(f) ? 'file' : null; seen.add(f); return { ...r, dup }; });
 }
+/* 출고 엑셀의 한 줄이 어느 품목인지 찾는다: 품목코드 → 품목명(+규격) 순서 */
+function matchOutRows(rows) {
+  const prods = analyze().products;
+  const used = new Map();
+  return rows.map(r => {
+    let cands = r.code ? prods.filter(p => p.code === r.code) : [];
+    if (!cands.length) cands = prods.filter(p => p.name === r.name && (!r.spec || (p.spec || '') === r.spec));
+    if (!cands.length) return { ...r, match: null, check: 'none' };
+    const p = cands.sort((x, y) => y.usable - x.usable)[0];
+    const left = p.usable - (used.get(p.key) || 0);
+    if (!(r.qty > 0)) return { ...r, match: p, check: 'qty' };
+    if (r.qty > left + 1e-9) return { ...r, match: p, check: 'short', left };
+    used.set(p.key, (used.get(p.key) || 0) + r.qty);
+    return { ...r, match: p, check: 'ok', left };
+  });
+}
 function renderPreview() {
   const box = $('#preview');
   if (!state.pending) { box.hidden = true; return; }
   box.hidden = false;
+  const isOut = state.pendingKind === 'out';
+  $('#upTitleText').textContent = `엑셀 업로드 · ${isOut ? '출고' : '입고'}`;
+  $('#bulkRow').hidden = isOut;
+  if (isOut) {
+    const rows = matchOutRows(state.pending);
+    const okN = rows.filter(r => r.check === 'ok').length;
+    $('#previewInfo').textContent = `${state.pendingFile} · 출고 ${rows.length}건을 읽었어요. 처리할 수 있는 ${okN}건만 출고하고, 품목을 못 찾았거나 재고가 모자란 줄은 건너뛰어요. 사용기한이 빠른 입고분부터 줄여요.`;
+    $('#dupWrap').hidden = true;
+    $('#previewHead').innerHTML = '<tr><th>#</th><th>확인</th><th>품목명</th><th>규격</th><th class="num">출고 수량</th><th class="num">현재 사용 가능</th><th>출고일</th><th>사용처</th><th>메모</th></tr>';
+    const label = { ok: '<span class="status s-ok">출고 가능</span>', none: '<span class="status s-bad">품목 없음</span>', short: '<span class="status s-bad">재고 부족</span>', qty: '<span class="status s-bad">수량 확인</span>' };
+    $('#previewRows').innerHTML = rows.map((r, i) => `<tr class="${r.check === 'ok' ? '' : 'dim'}"><td class="row-no">${i + 1}</td><td>${label[r.check]}</td>
+      <td>${esc(r.name || '-')}${r.code ? `<span class="sub-cell">${esc(r.code)}</span>` : ''}</td><td>${esc(r.spec || (r.match && r.match.spec) || '-')}</td>
+      <td class="num">${fmtQ(r.qty || 0, r.match ? r.match.unit : '')}</td><td class="num">${r.match ? fmtQ(r.check === 'short' ? r.left : r.match.usable, r.match.unit) : '-'}</td>
+      <td>${esc(r.date || '-')}</td><td>${esc(r.where || '-')}</td><td>${esc(r.memo || '')}</td></tr>`).join('');
+    $('#importSave').textContent = `${okN}건 출고 처리하기`;
+    return;
+  }
   const rows = markDuplicates(state.pending);
   const dupSaved = rows.filter(r => r.dup === 'saved').length, dupFile = rows.filter(r => r.dup === 'file').length;
   const incl = $('#importDup').checked;
   const toSave = rows.filter(r => incl || !r.dup).length;
-  const via = state.pendingVia === 'AI' ? 'AI가 빈 계절·기후를 채웠어요.' : state.pendingVia === '규칙' ? 'AI를 쓸 수 없어 기본 규칙으로 빈 계절·기후를 채웠어요.' : '';
+  const via = state.pendingVia === 'AI' ? 'AI가 빈 자재 분류·기후/환경 조건을 채웠어요.' : state.pendingVia === '규칙' ? '기본 규칙으로 빈 자재 분류·기후/환경 조건을 채웠어요.' : '';
   const dupMsg = dupSaved || dupFile ? ` 이미 저장된 재고와 같은 줄 ${dupSaved}건, 파일 안에서 겹치는 줄 ${dupFile}건은 ${incl ? '함께 저장해요' : '빼고 저장해요'}.` : ' 중복된 줄은 없어요.';
   const noUnit = rows.some(r => r.unitGuessed);
-  $('#previewInfo').textContent = `${state.pendingFile} · ${rows.length}건을 읽었어요. ${via}${dupMsg}${noUnit ? ' 단위 열이 없어 수량은 "개"로 읽었어요.' : ''}`;
+  $('#previewInfo').textContent = `${state.pendingFile} · 입고 ${rows.length}건을 읽었어요. ${via}${dupMsg}${noUnit ? ' 수량 단위 열이 없어 수량은 "개"로 읽었어요.' : ''}`;
   $('#dupWrap').hidden = !(dupSaved || dupFile);
-  $('#previewRows').innerHTML = rows.map(r => `<tr class="${r.dup && !incl ? 'dim' : ''}">
+  $('#previewHead').innerHTML = '<tr><th>#</th><th>확인</th><th>자재 분류</th><th>품목명</th><th>납품회사</th><th>규격</th><th>단위</th><th class="num">수량</th><th class="num">전산재고</th><th>품질 상태</th><th>사용기한</th><th>기후/환경 조건</th><th>근거</th></tr>';
+  $('#previewRows').innerHTML = rows.map((r, i) => `<tr class="${r.dup && !incl ? 'dim' : ''}"><td class="row-no">${i + 1}</td>
     <td>${r.dup ? `<span class="status s-hold">${r.dup === 'saved' ? '이미 저장됨' : '파일 내 중복'}</span>` : '<span class="status s-info">새 재고</span>'}</td>
+    <td>${esc(r.category || '분류 중')}</td>
     <td>${esc(r.name)}${r.code ? `<span class="sub-cell">${esc(r.code)}</span>` : ''}</td><td>${esc(r.supplier || '-')}</td><td>${esc(r.spec || '-')}</td><td>${esc(r.size || '-')}</td>
     <td class="num">${fmtQ(r.qty, unitOf(r))}</td><td class="num">${isNum(r.erpQty) ? fmtQ(r.erpQty, unitOf(r)) : '-'}</td><td>${lotPill(r)}</td><td>${expCell(r)}</td>
-    <td>${esc(r.season || '분류 중')}${seasonTag(r)}</td><td>${esc(r.climate || '분류 중')}</td><td>${esc(r.reason || '-')}</td></tr>`).join('');
+    <td>${esc(normClimate(r.climate) || '분류 중')}${srcTag(r)}</td><td>${esc(r.reason || '-')}</td></tr>`).join('');
   $('#importSave').textContent = `${toSave}건 저장하기`;
+}
+/* 업로드 창 내용을 PDF로 저장: 화면 밖에 흰 바탕 문서를 만들어 그림으로 찍은 뒤 A4 가로로 나눠 담는다 */
+async function exportUploadPdf() {
+  if (!window.html2canvas || !window.jspdf) { toast('PDF 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'); return; }
+  const stage = $('#pdfStage');
+  const kind = state.pendingKind === 'out' ? '출고' : '입고';
+  stage.innerHTML = `<h1>엑셀 업로드 내역 · ${kind}</h1><p>${esc(state.pendingFile)} · 만든 시각 ${esc(stamp(Date.now()))} · 기준일 ${esc(state.baseDate)}</p>
+    <p>${esc($('#previewInfo').textContent)}</p><table class="grid">${$('#previewHead').outerHTML}${$('#previewRows').outerHTML}</table>`;
+  const btn = $('#pdfBtn'); btn.disabled = true;
+  try {
+    const canvas = await window.html2canvas(stage, { scale: 2, backgroundColor: '#FFFFFF', useCORS: true, scrollX: 0, scrollY: 0,
+      onclone: doc => { const el = doc.getElementById('pdfStage'); el.style.left = '0'; el.style.top = '0'; el.style.position = 'absolute'; } });
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageW = 297, pageH = 210, margin = 8;
+    const w = pageW - margin * 2, pxPerMm = canvas.width / w, pageHpx = Math.floor((pageH - margin * 2) * pxPerMm);
+    for (let y = 0, page = 0; y < canvas.height; y += pageHpx, page++) {
+      const h = Math.min(pageHpx, canvas.height - y);
+      const part = document.createElement('canvas'); part.width = canvas.width; part.height = h;
+      part.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+      if (page) pdf.addPage();
+      pdf.addImage(part.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, w, h / pxPerMm);
+    }
+    const filename = `엑셀업로드_${kind}_${state.baseDate}.pdf`;
+    if (state.downloads) {
+      try { await state.downloads.save({ filename, data: pdf.output('arraybuffer') }); toast('PDF를 저장했어요.'); }
+      catch (e) { if (!e || e.code !== 'declined') toast('이 화면에서는 PDF를 저장할 수 없어요.'); }
+    } else if (!window.claude) { pdf.save(filename); toast('PDF를 내려받았어요.'); }
+    else toast('이 화면에서는 PDF를 저장할 수 없어요.');
+  } catch (e) { console.error(e); toast('PDF를 만들지 못했어요. 잠시 후 다시 시도해 주세요.'); }
+  finally { btn.disabled = false; stage.innerHTML = ''; }
 }
 
 /* ───────── 화면: 입력·요청 ───────── */
@@ -1247,7 +1353,7 @@ function renderEntry(a) {
   if (prods.some(p => p.key === cur)) sel.value = cur;
   const p = a.byKey.get(sel.value);
   $('#oUnit').textContent = p ? `(${p.unit})` : '';
-  $('#oAvail').textContent = p ? `사용 가능 ${fmtQ(p.usable, p.unit)} · 사용기한이 빠른 입고분부터 줄여요.${p.judged ? ` 조정 안전재고 ${fmtQ(p.adj, p.unit)}` : ''}` : '사용 가능한 재고가 있는 품목만 보여요.';
+  $('#oAvail').textContent = p ? `사용 가능 ${fmtQ(p.usable, p.unit)} · 사용기한이 빠른 입고분부터 줄여요.${p.judged ? ` 안전재고 ${fmtQ(p.adj, p.unit)}` : ''}` : '사용 가능한 재고가 있는 품목만 보여요.';
   const req = state.outReqId && state.requests.find(r => r.id === state.outReqId);
   $('#outReqNote').hidden = !req; $('#outReqClear').hidden = !req;
   if (req) $('#outReqNote').textContent = `${req.team} 요청을 처리하는 출고예요. 출고하면 요청이 자동으로 완료돼요.`;
@@ -1324,13 +1430,13 @@ const LIST_COLS = [
   { key: 'name', label: '품목명', cell: it => `${esc(it.name)}${it.example ? '<span class="tag">예시</span>' : ''}${it.code ? `<span class="sub-cell">${esc(it.code)}</span>` : ''}` },
   { key: 'supplier', label: '납품회사', cell: it => esc(it.supplier || '-') },
   { key: 'spec', label: '규격', cell: it => esc(it.spec || '-') },
-  { key: 'size', label: '치수', get: it => { const s = parseSize(it.size); return s.n === null ? it.size : `${s.u}|${String(s.n).padStart(12, '0')}`; }, cell: it => esc(it.size || '-') },
+  { key: 'size', label: '단위', get: it => { const s = parseSize(it.size); return s.n === null ? it.size : `${s.u}|${String(s.n).padStart(12, '0')}`; }, cell: it => esc(it.size || '-') },
   { key: 'qty', label: '실물 수량', num: true, get: it => Number(it.qty) || 0, cell: it => lotState(it) === 'expired' ? `${fmtQ(0, unitOf(it))}<span class="sub-cell bad-text">기한 만료 · ${fmtQ(it.qty, unitOf(it))} 제외</span>` : `${fmtQ(it.qty, unitOf(it))}${kgPer(it) ? `<span class="sub-cell">≈ ${fmt(Math.round((Number(it.qty) || 0) * kgPer(it)))} kg</span>` : ''}` },
   { key: 'erpQty', label: '전산재고', num: true, get: it => isNum(it.erpQty) ? Number(it.erpQty) : null, cell: it => isNum(it.erpQty) ? fmtQ(it.erpQty, unitOf(it)) : '-' },
   { key: 'status', label: '품질 상태', cell: it => `<select class="status-sel" data-status="${esc(it.id)}" aria-label="${esc(it.name)} 품질 상태">${STATUSES.map(s => `<option${s === it.status ? ' selected' : ''}>${s}</option>`).join('')}</select>${lotState(it) === 'expired' ? '<span class="sub-cell bad-text">기한 만료</span>' : ''}` },
   { key: 'expDate', label: '사용기한', cell: expCell },
-  { key: 'season', label: '계절', get: it => SEASONS.indexOf(it.season) < 0 ? null : SEASONS.indexOf(it.season), cell: it => `${esc(it.season || '-')}${seasonTag(it)}` },
-  { key: 'climate', label: '기후', cell: it => esc(it.climate || '-') },
+  { key: 'category', label: '자재 분류', get: it => CATEGORIES.indexOf(categoryOf(it)), cell: it => esc(categoryOf(it)) },
+  { key: 'climate', label: '기후/환경 조건', get: it => climateOf(it), cell: it => `${esc(climateOf(it) || '-')}${srcTag(it)}` },
   { key: 'reason', label: '분류 근거', cell: it => esc(it.reason || '-') },
   { key: 'inDate', label: '입고일', cell: it => esc(it.inDate || '-') },
   { key: 'location', label: '보관 위치', cell: it => esc(it.location || '-') },
@@ -1369,7 +1475,7 @@ function openEdit(id) {
   $('#eSpec').value = it.spec || ''; $('#eQty').value = it.qty ?? ''; $('#eQtyUnit').value = unitOf(it);
   $('#eErp').value = it.erpQty ?? ''; $('#eSafety').value = it.safety ?? '';
   $('#eStatus').value = it.status || '정상'; $('#eDate').value = it.inDate || ''; $('#eExp').value = it.expDate || ''; $('#eLoc').value = it.location || '';
-  $('#eSeason').value = it.season || ''; $('#eClimate').value = it.climate || '';
+  $('#eCategory').value = normCategory(it.category) || ''; $('#eClimate').value = climateOf(it) || '';
   $('#editPanel').hidden = false;
   $('#editPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
   $('#eQty').focus({ preventScroll: true });
@@ -1379,7 +1485,6 @@ function closeEdit() { state.editId = null; $('#editPanel').hidden = true; }
 /* ───────── 화면: 설정 ───────── */
 function renderSettingsForm() {
   const s = state.settings;
-  $('#sSeason').value = s.seasonFactor; $('#sClimate').value = s.climateFactor;
   $('#sBuffer').value = s.orderBuffer; $('#sStep').value = s.orderStep; $('#sSafety').value = s.defaultSafety ?? ''; $('#sExp').value = s.expSoonDays;
 }
 function renderSettingsInfo() {
@@ -1391,7 +1496,12 @@ function renderSettingsInfo() {
     : '이 컴퓨터의 브라우저에만 저장하고 있어요. 팀원과 같이 보려면 인터넷 주소로 공유한 화면을 쓰세요.';
   $('#aiInfo').textContent = state.sample
     ? 'AI 분류를 쓸 수 있어요. 처음 분류할 때 Claude 사용 허락을 한 번 물어봐요.'
-    : 'AI 분류를 쓸 수 없는 환경이라 키워드 기본 규칙으로 분류해요. 인터넷 주소로 연 화면에서는 AI가 분류해요.';
+    : '자재 분류와 기후/환경 조건은 키워드 기본 규칙으로 분류해요. (Claude 안에서 연 화면에서는 AI가 분류해요.)';
+  // 납품회사 목록
+  const sups = state.settings.suppliers || [];
+  $('#supplierChips').innerHTML = sups.length
+    ? sups.map(s => `<span class="chip-x">${esc(s)}<button type="button" data-sup-del="${esc(s)}" aria-label="${esc(s)} 목록에서 빼기">×</button></span>`).join('')
+    : '<p class="note">아직 등록된 회사가 없어요.</p>';
   $('#loadExamples').disabled = !state.canWrite || state.mode === 'connecting';
   $('#clearExamples').disabled = !state.canWrite || !state.items.some(i => i.example);
 }
@@ -1452,24 +1562,16 @@ async function setReqStatus(id, status, extra) {
 const ALIAS = {
   code: ['품목코드', '자재코드', '코드', '품번'],
   name: ['품목명', '품목', '품명', '자재명'], supplier: ['납품회사', '납품사', '공급사', '거래처'],
-  size: ['치수', '크기', '포장단위', '포장규격'], spec: ['규격'], qty: ['수량', '실물수량', '재고수량', '실재고'],
-  qtyUnit: ['단위', '수량단위', '재고단위'],
+  size: ['치수', '크기', '용량', '포장단위', '포장규격', '단위(1개당)'], spec: ['규격'], qty: ['수량', '실물수량', '재고수량', '실재고', '입고수량'],
+  qtyUnit: ['수량단위', '재고단위'], unitAny: ['단위'],
   inDate: ['입고일', '입고일자'], expDate: ['사용기한', '유효기간', '유통기한', '유효일자'], location: ['보관위치', '위치', '창고'], status: ['상태', '품질상태'],
   erpQty: ['전산재고', '전산수량', 'ERP재고', '전산재고수량'], safety: ['안전재고'],
-  season: ['계절', '계절구분', '사용계절', '성수기', '시즌'], climate: ['기후', '보관조건', '기후조건'],
+  category: ['자재분류', '분류', '카테고리', '대분류', '자재구분'], climate: ['기후/환경조건', '환경조건', '기후', '보관조건', '기후조건'],
+  // 출고 엑셀
+  outQty: ['출고수량', '사용수량', '투입수량', '수량'], outDate: ['출고일', '출고일자', '사용일', '투입일', '날짜', '일자'],
+  where: ['사용처', '출고처', '라인', '공정', '부서'], memo: ['메모', '비고'], kind: ['구분', '입출고', '입출고구분'],
 };
-function normSeason(v) {
-  const t = String(v ?? '').replace(/\s/g, '');
-  if (!t) return null;
-  if (/사계|연중|상시|전체|4계절/.test(t)) return '사계절';
-  const found = ['봄', '여름', '가을', '겨울'].filter(s => t.includes(s));
-  if (found.length) return found[0];
-  if (/spring/i.test(t)) return '봄';
-  if (/summer/i.test(t)) return '여름';
-  if (/fall|autumn/i.test(t)) return '가을';
-  if (/winter/i.test(t)) return '겨울';
-  return null;
-}
+const OUT_HEADERS = ['출고수량', '출고일', '출고일자', '사용처', '출고처', '사용수량', '투입수량', '투입일'];
 function toISODate(v) {
   if (!isNum(v)) return null;
   if (v instanceof Date && !isNaN(v)) return todayISO(v);
@@ -1477,39 +1579,59 @@ function toISODate(v) {
   const m = String(v).trim().match(/(\d{4})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2})/);
   return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
 }
-function mapRow(obj) {
+const rowReader = obj => {
   const n = {};
   for (const [k, v] of Object.entries(obj)) n[String(k).replace(/\s/g, '')] = v;
   const pick = f => { for (const a of ALIAS[f]) if (isNum(n[a])) return n[a]; return null; };
   const str = f => String(pick(f) ?? '').trim() || null;
+  return { pick, str };
+};
+function mapRow(obj) {
+  const { pick, str } = rowReader(obj);
   const st = String(pick('status') || '정상');
-  const season = normSeason(pick('season'));
-  const climate = CLIMATES.find(c => String(pick('climate') || '').replace(/\s/g, '') === c.replace(/\s/g, '')) || null;
-  const qu = str('qtyUnit');
+  const category = normCategory(pick('category'));
+  const climate = normClimate(pick('climate'));
+  // '단위' 열: 25kg처럼 숫자로 시작하면 1개당 용량, 포대·개처럼 글자면 수량 단위로 읽는다
+  let size = str('size'), qu = str('qtyUnit');
+  const any = str('unitAny');
+  if (any) { if (/^[\d.]/.test(any)) { if (!size) size = any.replace(/\s/g, ''); } else if (!qu) qu = any; }
   return {
-    code: str('code'), name: str('name') || '', supplier: str('supplier'), size: str('size'), spec: str('spec'),
+    code: str('code'), name: str('name') || '', supplier: str('supplier'), size, spec: str('spec'),
     qty: num(pick('qty')) ?? 0, qtyUnit: qu || '개', unitGuessed: !qu, erpQty: num(pick('erpQty')), safety: num(pick('safety')),
     inDate: toISODate(pick('inDate')), expDate: toISODate(pick('expDate')), location: str('location'),
     status: st.includes('불량') ? '불량' : st.includes('보류') ? '보류' : '정상',
-    season, climate, seasonSrc: season ? 'user' : null, climateSrc: climate ? 'user' : null,
+    category, climate, categorySrc: category ? 'user' : null, climateSrc: climate ? 'user' : null,
   };
+}
+function mapOutRow(obj) {
+  const { pick, str } = rowReader(obj);
+  return { code: str('code'), name: str('name') || '', spec: str('spec'), qty: num(pick('outQty')) ?? 0,
+    date: toISODate(pick('outDate')) || state.baseDate, where: str('where'), memo: str('memo') };
 }
 async function handleFile(file) {
   if (!file) return;
   if (state.busy) { toast('지금 처리하는 중이에요. 끝난 뒤 다시 올려 주세요.'); return; }
   if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { toast('XLSX, XLS, CSV 파일만 올릴 수 있어요.'); return; }
   if (!window.XLSX) { toast('엑셀을 읽는 도구를 불러오지 못했어요. 인터넷 연결을 확인한 뒤 새로고침해 주세요.'); return; }
-  let rows;
+  let raw;
   try {
     const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true }).map(mapRow).filter(r => r.name);
+    raw = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true });
   } catch { toast('파일을 읽지 못했어요. 엑셀에서 다시 저장한 뒤 올려 주세요.'); return; }
+  // 입고/출고 판단: 고른 버튼을 따르되, 열 이름에 출고일·사용처 같은 출고 열이 있으면 출고로 본다
+  const heads = Object.keys(raw[0] || {}).map(h => String(h).replace(/\s/g, ''));
+  const looksOut = heads.some(h => OUT_HEADERS.includes(h)) || raw.some(r => /출고/.test(String(rowReader(r).pick('kind') || '')));
+  let kind = state.upKind;
+  if (kind === 'in' && looksOut) { kind = 'out'; toast('출고 엑셀로 보여서 출고로 읽었어요.'); }
+  const rows = kind === 'out' ? raw.map(mapOutRow).filter(r => r.name || r.code) : raw.map(mapRow).filter(r => r.name);
   if (!rows.length) { toast('품목명 열을 찾지 못했어요. 첫 줄에 "품목명, 수량" 같은 열 이름을 넣어 주세요.'); return; }
   setView('home');
-  state.pending = rows; state.pendingFile = file.name; state.pendingVia = null; $('#importDup').checked = false; renderPreview();
-  $('#preview').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  setBusy('#importBusy', state.sample ? 'AI가 빈 계절·기후를 분류하고 있어요… (보통 몇 초, 길면 1분)' : '기본 규칙으로 분류하고 있어요…');
+  state.pending = rows; state.pendingKind = kind; state.pendingFile = file.name; state.pendingVia = null; $('#importDup').checked = false; $('#bulkSupplier').value = '';
+  renderPreview();
+  $('#importCancel').focus();
+  if (kind === 'out') return;
+  setBusy('#importBusy', state.sample ? 'AI가 빈 자재 분류·기후/환경 조건을 채우고 있어요… (보통 몇 초, 길면 1분)' : '기본 규칙으로 분류하고 있어요…');
   try {
     const r = await classifyRows(rows);
     if (state.pending === rows) { state.pending = r.rows; state.pendingVia = r.via; }
@@ -1529,19 +1651,19 @@ async function exportExcel() {
   const a = analyze();
   const J = { ok: '충분', hold: '보류 확인', short: '부족', none: '기준 없음' };
   const products = a.products.map(p => ({
-    품목코드: p.code || '', 품목명: p.name, 규격: p.spec || '', 납품회사: p.supplier || '', 치수: p.size || '', 단위: p.unit,
+    자재분류: p.category || '', 품목코드: p.code || '', 품목명: p.name, 규격: p.spec || '', 납품회사: p.supplier || '', '단위(1개당)': p.size || '', 수량단위: p.unit,
     보유수량: p.total, 사용가능: p.usable, 보류: p.hold, 불량: p.bad, 기한만료: p.expired, '환산중량(kg)': p.kgOk ? Math.round(p.kgTotal) : '',
-    전산재고: p.hasErp ? p.erp : '', '전산-실물 차이': p.hasErp ? p.erp - p.total : '', 기본안전재고: p.judged ? p.base : '',
-    조정안전재고: p.judged ? p.adj : '', 조정근거: p.why.join(', ') || '조정 없음', 재고판정: J[p.judge], 발주추천: p.order || '', 계절: p.season || '', 기후: p.climate || '',
+    전산재고: p.hasErp ? p.erp : '', '전산-실물 차이': p.hasErp ? p.erp - p.total : '', 안전재고: p.judged ? p.base : '',
+    재고판정: J[p.judge], 발주추천: p.order || '', '기후/환경 조건': p.climate || '',
   }));
   const orders = a.products.filter(p => p.judge === 'short' || p.judge === 'hold').map(p => ({
     품목코드: p.code || '', 품목명: p.name, 규격: p.spec || '', 납품회사: p.supplier || '', 단위: p.unit, 판정: J[p.judge],
-    사용가능: p.usable, 보류중: p.hold, 조정안전재고: p.adj, 발주추천: p.order, 비고: p.judge === 'hold' ? '보류 검사 결과 확인 후 발주' : '',
+    사용가능: p.usable, 보류중: p.hold, 안전재고: p.adj, 발주추천: p.order, 비고: p.judge === 'hold' ? '보류 검사 결과 확인 후 발주' : '',
   }));
   const lots = state.items.map(it => ({
-    품목코드: it.code || '', 품목명: it.name, 규격: it.spec || '', 납품회사: it.supplier || '', 치수: it.size || '', 수량: Number(it.qty) || 0, 단위: unitOf(it),
+    자재분류: categoryOf(it), 품목코드: it.code || '', 품목명: it.name, 규격: it.spec || '', 납품회사: it.supplier || '', '단위(1개당)': it.size || '', 수량: Number(it.qty) || 0, 수량단위: unitOf(it),
     전산재고: isNum(it.erpQty) ? Number(it.erpQty) : '', 안전재고: isNum(it.safety) ? Number(it.safety) : '', 상태: { ok: '정상', hold: '보류', bad: '불량', expired: '기한 만료', future: '입고 전' }[lotState(it)],
-    입고일: it.inDate || '', 사용기한: it.expDate || '', 보관위치: it.location || '', 계절: it.season || '', 기후: it.climate || '',
+    입고일: it.inDate || '', 사용기한: it.expDate || '', 보관위치: it.location || '', '기후/환경 조건': climateOf(it) || '',
   }));
   const moves = [...state.moves].sort((x, y) => (y.at || 0) - (x.at || 0)).map(m => ({
     시간: stamp(m.at), 구분: m.type, 품목: m.name || '', 규격: m.spec || '', 수량: isNum(m.qty) ? Number(m.qty) : '', 단위: m.unit || '', 내용: m.detail || '', 팀: m.team || '', 이름: m.by || '',
@@ -1570,9 +1692,7 @@ async function exportExcel() {
 /* ───────── 이벤트 ───────── */
 function bind() {
   $('#baseDate').value = state.baseDate;
-  // 기준일을 바꾸면 그 날짜의 계절이 계절 칸에 자동으로 들어가고 바로 적용된다
-  $('#baseDate').addEventListener('change', e => { state.baseDate = e.target.value || todayISO(); applySeasonByDate(); render(); });
-  applySeasonByDate();
+  $('#baseDate').addEventListener('change', e => { state.baseDate = e.target.value || todayISO(); render(); });
   // 새 요청 창: 바깥을 누르거나 Esc를 누르면 닫힌다
   document.addEventListener('click', e => {
     if (state.reqPopOpen && !e.target.closest('.req-anchor')) { state.reqPopOpen = false; renderReqPop(); }
@@ -1581,9 +1701,10 @@ function bind() {
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.reqPopOpen) { state.reqPopOpen = false; renderReqPop(); $('#reqTop').focus(); } });
   $$('.navbtn').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
   const opt = (list, first) => (first ? `<option value="">${first}</option>` : '') + list.map(s => `<option>${s}</option>`).join('');
-  $('#iSeason').innerHTML = opt(SEASONS, '자동 (AI 분류)'); $('#iClimate').innerHTML = opt(CLIMATES, '자동 (AI 분류)');
-  $('#eSeason').innerHTML = opt(SEASONS, '미분류'); $('#eClimate').innerHTML = opt(CLIMATES, '미분류');
+  $('#iCategory').innerHTML = opt(CATEGORIES, '자동 분류'); $('#iClimate').innerHTML = opt(CLIMATES, '자동 분류');
+  $('#eCategory').innerHTML = opt(CATEGORIES, '자동 분류'); $('#eClimate').innerHTML = opt(CLIMATES, '미분류');
   $('#iSizeUnit').innerHTML = opt(SIZE_UNITS); $('#eSizeUnit').innerHTML = opt(SIZE_UNITS);
+  $('#fSizeUnit').innerHTML = opt(SIZE_UNITS, '단위');
   $('#iQtyUnit').innerHTML = opt(QTY_UNITS); $('#eQtyUnit').innerHTML = opt(QTY_UNITS);
   $('#iDate').value = todayISO(); $('#oDate').value = todayISO();
   $('#rTeam').value = state.me.team; $('#rName').value = state.me.name; $('#iWorker').value = state.me.name;
@@ -1601,12 +1722,12 @@ function bind() {
     e.preventDefault();
     const v = id => $(id).value.trim();
     state.filters = { name: v('#fName'), supplier: v('#fSupplier'), sizeNum: v('#fSizeNum'), sizeUnit: v('#fSizeUnit'),
-      spec: v('#fSpec'), season: v('#fSeason'), status: v('#fStatus'), date: v('#fDate') };
+      spec: v('#fSpec'), category: v('#fCategory'), status: v('#fStatus'), date: v('#fDate') };
     render();
     const n = visibleProducts(analyze()).length;
     toast(Object.values(state.filters).some(Boolean) ? `조건에 맞는 품목 ${n}개를 찾았어요.` : `전체 품목 ${n}개를 보여 드려요.`);
   });
-  $('#fSizeUnit').addEventListener('input', renderLists);
+  $('#fSizeUnit').addEventListener('change', renderLists);
   const resetFilters = () => { state.filters = {}; $('#filterForm').reset(); render(); };
   $('#filterReset').addEventListener('click', resetFilters);
   $('#refreshBtn').addEventListener('click', async () => {
@@ -1630,9 +1751,51 @@ function bind() {
   $('#exportBtn').addEventListener('click', exportExcel);
   bindDrop('#homeDrop', '#homeFile');
   $('#importDup').addEventListener('change', renderPreview);
-  $('#importCancel').addEventListener('click', () => { state.pending = null; renderPreview(); });
+  const closeUpload = () => { state.pending = null; renderPreview(); };
+  $('#importCancel').addEventListener('click', closeUpload);
+  $('#preview').addEventListener('click', e => { if (e.target === e.currentTarget && !state.busy) closeUpload(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.pending && !state.busy) closeUpload(); });
+  $('#pdfBtn').addEventListener('click', exportUploadPdf);
+  // 업로드 종류(입고/출고) 고르기
+  const setUpKind = k => {
+    state.upKind = k;
+    $$('[data-upkind]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.upkind === k)));
+    $('#dropText').textContent = `${k === 'out' ? '출고' : '입고'} 엑셀을 끌어다 놓거나 눌러서 올려 주세요.`;
+    $('#dropHint').textContent = k === 'out' ? '(열 이름 예: 품목명, 규격, 출고수량, 출고일, 사용처, 메모)' : '(열 이름 예: 품목명, 납품회사, 단위, 규격, 수량, 수량단위, 입고일, 사용기한)';
+  };
+  $$('[data-upkind]').forEach(b => b.addEventListener('click', () => setUpKind(b.dataset.upkind)));
+  setUpKind('in');
+  // 납품회사 일괄 지정
+  const applyBulk = onlyEmpty => {
+    if (!state.pending) return;
+    const name = $('#bulkSupplier').value.trim();
+    if (!name) { toast('지정할 납품회사 이름을 적어 주세요.'); $('#bulkSupplier').focus(); return; }
+    let n = 0;
+    state.pending = state.pending.map(r => { if (onlyEmpty && r.supplier) return r; n++; return { ...r, supplier: name }; });
+    renderPreview(); toast(`${n}건의 납품회사를 '${name}'(으)로 지정했어요.`);
+  };
+  $('#bulkEmpty').addEventListener('click', () => applyBulk(true));
+  $('#bulkAll').addEventListener('click', () => applyBulk(false));
   $('#importSave').addEventListener('click', async () => {
     if (!state.pending || state.busy) return;
+    if (state.pendingKind === 'out') {
+      if (!guardWrite() || !needWorker()) return;
+      const rows = matchOutRows(state.pending).filter(r => r.check === 'ok');
+      if (!rows.length) { toast('출고할 수 있는 줄이 없어요. 품목명과 재고를 확인해 주세요.'); return; }
+      let done = 0;
+      setBusy('#importBusy', `출고 ${rows.length}건을 처리하고 있어요…`);
+      try {
+        for (const r of rows) {
+          setBusy('#importBusy', `출고 처리 중… (${done + 1}/${rows.length})`);
+          if (!await doOut(r.match.key, r.qty, { where: r.where || '', memo: [r.memo, `엑셀 ${state.pendingFile}`].filter(Boolean).join(' · '), date: r.date, erp: true })) break;
+          done++;
+        }
+      } finally { setBusy('#importBusy', ''); }
+      const total = state.pending.length;
+      state.pending = null; renderPreview();
+      toast(`출고 ${done}건을 처리했어요.${total - done ? ` ${total - done}건은 건너뛰었어요.` : ''}`);
+      return;
+    }
     const incl = $('#importDup').checked;
     const marked = markDuplicates(state.pending);
     const rows = marked.filter(r => incl || !r.dup);
@@ -1650,7 +1813,7 @@ function bind() {
 
   /* 공통 클릭 */
   document.addEventListener('click', async e => {
-    const t = e.target.closest('[data-sort],[data-expand],[data-detail],[data-action],[data-go],[data-del],[data-edit],[data-mode],[data-type],[data-f],[data-req-act],[data-req-out],[data-req-toggle]');
+    const t = e.target.closest('[data-sort],[data-expand],[data-detail],[data-action],[data-go],[data-del],[data-edit],[data-mode],[data-type],[data-f],[data-req-act],[data-req-out],[data-req-toggle],[data-sup-del]');
     if (!t) return;
     const d = t.dataset;
     if (d.sort) {
@@ -1666,6 +1829,10 @@ function bind() {
     else if (d.action === 'reset-filter') resetFilters();
     else if (d.action === 'examples') loadExamples();
     else if (d.action === 'req-pop') { state.reqPopOpen = !state.reqPopOpen; renderReqPop(); }
+    else if (d.supDel) {
+      const list = (state.settings.suppliers || []).filter(s => s !== d.supDel);
+      if (await saveSettings({ ...state.settings, suppliers: list })) toast(`'${d.supDel}'을(를) 목록에서 뺐어요.`);
+    }
     else if (d.mode) { state.entryMode = d.mode; render(); }
     else if (d.type) { state.reqType = d.type; renderBoard(); }
     else if (d.f) { state.reqFilter = d.f; renderBoard(); }
@@ -1703,18 +1870,18 @@ function bind() {
       size: $('#iSizeNum').value ? `${num($('#iSizeNum').value)}${$('#iSizeUnit').value}` : null,
       spec: $('#iSpec').value.trim(), qty, qtyUnit: $('#iQtyUnit').value, erpQty: num($('#iErp').value), safety: num($('#iSafety').value),
       inDate: $('#iDate').value || null, expDate: $('#iExp').value || null, location: $('#iLoc').value.trim(), status: $('#iStatus').value,
-      season: $('#iSeason').value || null, climate: $('#iClimate').value || null,
+      category: $('#iCategory').value || null, climate: $('#iClimate').value || null,
     };
-    row.seasonSrc = row.season ? 'user' : null; row.climateSrc = row.climate ? 'user' : null;
-    if (row.season && row.climate) { row.reason = '직접 선택'; row.classifiedBy = '직접'; }
+    row.categorySrc = row.category ? 'user' : null; row.climateSrc = row.climate ? 'user' : null;
+    if (row.category && row.climate) { row.reason = '직접 선택'; row.classifiedBy = '직접'; }
     else {
-      setBusy('#itemBusy', state.sample ? 'AI가 계절·기후를 분류하고 있어요…' : '기본 규칙으로 분류하고 있어요…');
+      setBusy('#itemBusy', state.sample ? 'AI가 자재 분류·기후/환경 조건을 정하고 있어요…' : '기본 규칙으로 분류하고 있어요…');
       try { row = (await classifyRows([row])).rows[0]; } finally { setBusy('#itemBusy', ''); }
     }
     if (await addItems([row])) {
       await logMove('입고', { key: keyOf(row), name: row.name, spec: row.spec, qty: row.qty, unit: row.qtyUnit, date: row.inDate, detail: `${row.supplier || ''} · ${row.status}`.trim() });
       $('#itemForm').reset(); $('#iDate').value = todayISO();
-      toast(`입고했어요 · ${row.season} / ${row.climate} (${row.classifiedBy} 분류)`);
+      toast(`입고했어요 · ${row.category} / ${row.climate} (${row.classifiedBy} 분류)`);
     }
   });
 
@@ -1788,17 +1955,19 @@ function bind() {
       spec: $('#eSpec').value.trim() || null, qty: num($('#eQty').value) ?? 0, qtyUnit: $('#eQtyUnit').value,
       erpQty: num($('#eErp').value), safety: num($('#eSafety').value),
       status: $('#eStatus').value, inDate: $('#eDate').value || null, expDate: $('#eExp').value || null, location: $('#eLoc').value.trim() || null,
-      season: $('#eSeason').value || null, climate: $('#eClimate').value || null,
+      category: $('#eCategory').value || null, climate: $('#eClimate').value || null,
     };
     if (!next.name) { toast('품목명을 입력해 주세요.'); return; }
-    const LABEL = { name: '품목명', code: '품목코드', supplier: '납품회사', size: '치수', spec: '규격', qty: '수량', qtyUnit: '단위', erpQty: '전산재고', safety: '안전재고', status: '품질 상태', inDate: '입고일', expDate: '사용기한', location: '보관 위치', season: '계절', climate: '기후' };
-    const prev = { ...it, qtyUnit: unitOf(it) };
+    const LABEL = { name: '품목명', code: '품목코드', supplier: '납품회사', size: '단위', spec: '규격', qty: '수량', qtyUnit: '수량 단위', erpQty: '전산재고', safety: '안전재고', status: '품질 상태', inDate: '입고일', expDate: '사용기한', location: '보관 위치', category: '자재 분류', climate: '기후/환경 조건' };
+    const prev = { ...it, qtyUnit: unitOf(it), category: normCategory(it.category), climate: climateOf(it) };
+    // 자재 분류를 '자동 분류'로 두면 규칙이 다시 정하게 비워 둔다
+    if (!next.category) next.category = null;
     const patch = {}, changes = [];
     for (const k of Object.keys(next)) {
       if ((prev[k] ?? null) !== next[k]) { patch[k] = next[k]; changes.push(`${LABEL[k]} ${prev[k] ?? '-'} → ${next[k] ?? '-'}`); }
     }
     if (!changes.length) { toast('바뀐 내용이 없어요.'); return; }
-    if ('season' in patch) patch.seasonSrc = 'user';
+    if ('category' in patch) patch.categorySrc = patch.category ? 'user' : null;
     if ('climate' in patch) patch.climateSrc = 'user';
     if (await updateItem(it.id, patch)) {
       await logMove('수정', { key: keyOf({ ...it, ...patch }), name: next.name, spec: next.spec, qty: next.qty, unit: next.qtyUnit, detail: changes.join(', ') });
@@ -1809,13 +1978,13 @@ function bind() {
     if (state.busy || !guardWrite() || !state.items.length) return;
     const items = state.items.filter(i => !i.example);
     if (!items.length) { toast('다시 분류할 실제 재고가 없어요. 예시 데이터는 분류를 바꾸지 않아요.'); return; }
-    setBusy('#listBusy', state.sample ? `AI가 ${items.length}건을 다시 분류하고 있어요… (사람이 적은 계절·기후는 그대로 둬요)` : '기본 규칙으로 다시 분류하고 있어요…');
+    setBusy('#listBusy', state.sample ? `AI가 ${items.length}건을 다시 분류하고 있어요… (사람이 적은 자재 분류·기후/환경 조건은 그대로 둬요)` : '기본 규칙으로 다시 분류하고 있어요…');
     try {
       const r = await classifyRows(items, true);
       for (let i = 0; i < items.length; i++) {
         const a = items[i], b = r.rows[i];
-        if (a.season !== b.season || a.climate !== b.climate || a.reason !== b.reason || a.classifiedBy !== b.classifiedBy) {
-          if (!await updateItem(a.id, { season: b.season, climate: b.climate, reason: b.reason, classifiedBy: b.classifiedBy })) break;
+        if (a.category !== b.category || a.climate !== b.climate || a.reason !== b.reason || a.classifiedBy !== b.classifiedBy) {
+          if (!await updateItem(a.id, { category: b.category, climate: b.climate, reason: b.reason, classifiedBy: b.classifiedBy })) break;
         }
       }
       toast(r.via ? `${items.length}건을 ${r.via} 분류로 다시 정리했어요.` : '모두 사람이 적은 값이라 바꿀 게 없어요.');
@@ -1826,10 +1995,18 @@ function bind() {
   $('#settingsForm').addEventListener('submit', async e => {
     e.preventDefault();
     const v = (id, min, d) => { const n = num($(id).value); return n === null || n < min ? d : n; };
-    const s = { seasonFactor: v('#sSeason', 1, DEFAULTS.seasonFactor), climateFactor: v('#sClimate', 1, DEFAULTS.climateFactor),
+    const s = { ...state.settings,
       orderBuffer: v('#sBuffer', 1, DEFAULTS.orderBuffer), orderStep: v('#sStep', 1, DEFAULTS.orderStep),
       defaultSafety: v('#sSafety', 0, DEFAULTS.defaultSafety), expSoonDays: v('#sExp', 1, DEFAULTS.expSoonDays) };
     if (await saveSettings(s)) { renderSettingsForm(); toast('조정 기준을 저장했어요.'); }
+  });
+  $('#supplierForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = $('#supplierName').value.trim();
+    if (!name) return;
+    const list = state.settings.suppliers || [];
+    if (list.includes(name)) { toast('이미 등록된 회사예요.'); return; }
+    if (await saveSettings({ ...state.settings, suppliers: [...list, name] })) { $('#supplierName').value = ''; toast(`'${name}'을(를) 납품회사 목록에 추가했어요.`); }
   });
   $('#loadExamples').addEventListener('click', loadExamples);
   $('#clearExamples').addEventListener('click', async () => {
