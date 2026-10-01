@@ -129,7 +129,10 @@ tr.group td small{font-weight:500;color:var(--muted);margin-left:8px}
   --ok:#1D7349;--ok-soft:#EAF5EE;--warn:#B8650F;--warn-soft:#FCF1E3;--bad:#C2352F;--bad-soft:#FBEAE9}
 .pdf-stage h1{font:700 20px var(--font-display);margin:0 0 4px;color:#1D7349}
 .pdf-stage p{margin:0 0 12px;color:#5E6E63}
-.pdf-stage table.grid td,.pdf-stage table.grid th{white-space:normal}
+.pdf-stage table.grid{font-size:12px}
+.pdf-stage table.grid td,.pdf-stage table.grid th{white-space:normal;padding:9px 7px}
+.pdf-stage table.grid th,.pdf-stage table.grid td.num,.pdf-stage table.grid td.row-no{white-space:nowrap;word-break:keep-all}
+.pdf-stage table.grid td{word-break:keep-all}
 .req-anchor{position:relative}
 .req-pop{position:absolute;right:0;top:calc(100% + 8px);width:min(380px,calc(100vw - 32px));max-height:min(480px,70vh);overflow:auto;z-index:20;padding:14px;display:grid;gap:10px;box-shadow:0 12px 32px rgba(0,0,0,.18)}
 .req-pop h3{margin:0;font:700 15px var(--font-display);display:flex;justify-content:space-between;align-items:center}
@@ -1318,18 +1321,33 @@ async function exportUploadPdf() {
     <p>${esc($('#previewInfo').textContent)}</p><table class="grid">${$('#previewHead').outerHTML}${$('#previewRows').outerHTML}</table>`;
   const btn = $('#pdfBtn'); btn.disabled = true;
   try {
+    // 찍기 전에 표의 각 줄이 끝나는 위치를 재 둔다 → 페이지를 줄 경계에서만 나눠 글자가 잘리지 않게
+    const base = stage.getBoundingClientRect();
+    const head = stage.querySelector('thead').getBoundingClientRect();
+    const rowEnds = [...stage.querySelectorAll('tbody tr')].map(tr => tr.getBoundingClientRect().bottom - base.top);
     const canvas = await window.html2canvas(stage, { scale: 2, backgroundColor: '#FFFFFF', useCORS: true, scrollX: 0, scrollY: 0,
       onclone: doc => { const el = doc.getElementById('pdfStage'); el.style.left = '0'; el.style.top = '0'; el.style.position = 'absolute'; } });
+    const ratio = canvas.width / base.width;
+    const breaks = rowEnds.map(v => Math.round(v * ratio));
+    const headTop = Math.round((head.top - base.top) * ratio), headH = Math.round(head.height * ratio);
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const pageW = 297, pageH = 210, margin = 8;
     const w = pageW - margin * 2, pxPerMm = canvas.width / w, pageHpx = Math.floor((pageH - margin * 2) * pxPerMm);
-    for (let y = 0, page = 0; y < canvas.height; y += pageHpx, page++) {
-      const h = Math.min(pageHpx, canvas.height - y);
-      const part = document.createElement('canvas'); part.width = canvas.width; part.height = h;
-      part.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+    const slice = (y, h) => { const c = document.createElement('canvas'); c.width = canvas.width; c.height = h; c.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h); return c.toDataURL('image/jpeg', 0.92); };
+    for (let y = 0, page = 0; y < canvas.height - 2; page++) {
+      // 두 번째 쪽부터는 위에 표 제목 줄을 다시 붙인다
+      const room = pageHpx - (page ? headH : 0);
+      let end = Math.min(canvas.height, y + room);
+      if (end < canvas.height) {
+        const fit = breaks.filter(b => b > y + 4 && b <= y + room);
+        if (fit.length) end = fit[fit.length - 1];   // 들어가는 마지막 줄 끝에서 자른다
+      }
       if (page) pdf.addPage();
-      pdf.addImage(part.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, w, h / pxPerMm);
+      let top = margin;
+      if (page) { pdf.addImage(slice(headTop, headH), 'JPEG', margin, top, w, headH / pxPerMm); top += headH / pxPerMm; }
+      pdf.addImage(slice(y, end - y), 'JPEG', margin, top, w, (end - y) / pxPerMm);
+      y = end;
     }
     const filename = `엑셀업로드_${kind}_${state.baseDate}.pdf`;
     if (state.downloads) {
