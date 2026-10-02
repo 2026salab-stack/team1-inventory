@@ -222,6 +222,15 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
 .lane h3{margin:0;font:700 14px var(--font-display);display:flex;justify-content:space-between;align-items:center}
 .lane .count{font:600 12px var(--font-body);background:var(--surface);border-radius:999px;padding:1px 9px;color:var(--muted)}
 .lane.new .count{background:var(--bad);color:var(--on-bad)}
+.lane-tools{display:flex;gap:6px;align-items:center}
+.lane-tools .btn.sm{min-height:26px;padding:0 9px;font-size:12px}
+.ticket{position:relative}
+.ticket.closed .t-head{padding-right:22px}
+.t-del{position:absolute;top:6px;right:6px;border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:3px 6px;border-radius:6px}
+.t-del:hover{color:var(--bad);background:var(--bad-soft)}
+.t-del:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.list-tabs button{display:inline-flex;align-items:center;gap:6px;font:700 15px var(--font-display);padding:9px 16px}
+.list-tabs svg.i{width:18px;height:18px}
 .lane-body{display:grid;gap:10px}
 .lane-empty{font-size:12px;color:var(--muted);text-align:center;padding:14px 4px}
 .ticket{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:8px;min-width:0}
@@ -253,6 +262,12 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
 
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 32px);z-index:10;box-shadow:0 8px 24px rgba(0,0,0,.18)}
 
+/* 노트북 화면: 조회 패널을 표 위로 올려, 표의 '품질 상태'·'재고 판정' 칸이 가로 스크롤 없이 보이게 한다 */
+@media (max-width:1500px){
+  #view-home{grid-template-columns:minmax(0,1fr)}
+  #filterForm{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));align-items:end}
+  #filterForm .up-field,#filterForm .btn.block,#filterForm #filterReset{grid-column:1/-1}
+}
 @media (max-width:1240px){
   .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   #view-home,#view-input{grid-template-columns:minmax(0,1fr)}
@@ -317,7 +332,7 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
           <div class="field"><label for="fCategory">자재 분류</label><input class="input" id="fCategory" list="dlCategory" placeholder="전체 (예: 수지)"></div>
           <div class="field"><label for="fStatus">품질 상태</label><input class="input" id="fStatus" list="dlStatus" placeholder="전체 (정상·보류·불량·기한 만료)"></div>
           <div class="field"><label for="fDate">입고일 <small>(이 날짜 이후, 선택)</small></label><input class="input" type="date" id="fDate"></div>
-          <div class="field">
+          <div class="field up-field">
             <label for="homeFile">엑셀 파일 업로드</label>
             <div class="seg wide" role="group" aria-label="업로드 종류">
               <button type="button" data-upkind="in" aria-pressed="true">입고 엑셀</button>
@@ -371,7 +386,6 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
             <h3 class="sec-title"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>분류별 사용 가능 재고</h3>
             <span class="note" id="tableCount"></span>
           </div>
-          <p class="note">한 줄이 한 품목이에요. 제목을 누르면 오름차순·내림차순으로 정렬하고, ▸를 누르면 입고분별 수량과 품질 상태가 보여요.</p>
           <div class="table-wrap">
             <table class="grid">
               <thead id="homeHead"></thead>
@@ -391,6 +405,7 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
       <section class="panel card">
         <h2 class="sec-title"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>작업자 입력</h2>
         <div class="field" style="margin-top:14px"><label for="iWorker" class="sr">작업자 이름</label><input class="input" id="iWorker" placeholder="작업자 이름을 입력하세요 (예: 김태양)" autocomplete="name"></div>
+        <div class="field" style="margin-top:10px"><label for="iTeam" class="sr">소속 팀</label><input class="input" id="iTeam" list="dlTeam" placeholder="소속 팀을 입력하세요 (예: 생산1팀)"></div>
         <div class="seg wide" role="group" aria-label="입력 종류" style="margin-top:14px">
           <button type="button" data-mode="in" aria-pressed="true">입고 등록</button>
           <button type="button" data-mode="out" aria-pressed="false">출고 등록</button>
@@ -458,7 +473,7 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
         <form class="req-form" id="reqForm" autocomplete="off">
           <div class="row2">
             <div class="field"><label for="rTeam">보내는 팀</label><input class="input" id="rTeam" list="dlTeam" required placeholder="예: 생산1팀"></div>
-            <div class="field"><label for="rName">이름 <small>(선택)</small></label><input class="input" id="rName" placeholder="예: 김태양"></div>
+            <div class="field"><label for="rName">이름</label><input class="input" id="rName" placeholder="예: 김태양"></div>
           </div>
           <div class="seg" role="group" aria-label="요청 종류" id="rType">
             <button type="button" data-type="재고 요청" aria-pressed="true">재고 요청</button>
@@ -487,7 +502,7 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
         <div class="board" id="board">
           <div class="lane new"><h3>새 요청 <span class="count" id="cNew">0</span></h3><div class="lane-body" id="laneNew"></div></div>
           <div class="lane doing"><h3>처리 중 <span class="count" id="cDoing">0</span></h3><div class="lane-body" id="laneDoing"></div></div>
-          <div class="lane done"><h3>완료 <span class="count" id="cDone">0</span></h3><div class="lane-body" id="laneDone"></div></div>
+          <div class="lane done"><h3>완료 <span class="lane-tools"><button class="btn sm danger" type="button" id="doneClear" data-req-clear="1" hidden>전체 삭제</button><span class="count" id="cDone">0</span></span></h3><div class="lane-body" id="laneDone"></div></div>
         </div>
       </section>
     </section>
@@ -520,24 +535,38 @@ table.grid td.row-no{color:var(--muted);font-variant-numeric:tabular-nums;width:
 
       <section class="panel card">
         <div class="toolbar">
-          <div>
-            <h2 class="sec-title"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M11 20V5M17 20v-7M3 20h18"/></svg>입고분 전체 목록</h2>
-            <p class="sub" id="listCount">0건</p>
+          <h2 class="sr" id="listTitle">입고분 전체 목록</h2>
+          <div class="seg list-tabs" role="group" aria-label="목록 종류">
+            <button type="button" data-listkind="in" aria-pressed="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>입고분 전체 목록</button>
+            <button type="button" data-listkind="out" aria-pressed="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M4 21h16"/></svg>출고분 전체 목록</button>
           </div>
           <div class="actions">
             <input class="input" id="listSearch" type="search" placeholder="품목명·코드·납품회사 검색" aria-label="검색">
-            <button class="btn" id="reclassifyAll"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></svg>AI로 다시 분류</button>
           </div>
         </div>
-        <div class="busy" id="listBusy" hidden style="margin-top:12px"></div>
         <div class="table-wrap" style="margin-top:16px">
           <table class="grid"><thead id="listHead"></thead><tbody id="listRows"></tbody></table>
         </div>
       </section>
 
       <section class="panel card">
-        <h2 class="sec-title"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>입출고 · 변경 기록</h2>
-        <p class="sub">누가 언제 입고·출고·수정·삭제했는지 최근 기록을 보여 줘요.</p>
+        <div class="toolbar">
+          <div>
+            <h2 class="sec-title"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>입출고 · 변경 기록</h2>
+            <p class="sub" id="moveRange">누가 언제 입고·출고·수정·삭제했는지 최근 기록을 보여 줘요.</p>
+          </div>
+          <div class="actions">
+            <label class="sr" for="moveDate">날짜 고르기</label>
+            <input class="input" type="date" id="moveDate" style="width:auto" title="고른 날짜의 기록만 보기">
+            <div class="seg" role="group" aria-label="기간" id="moveQuick">
+              <button type="button" data-mrange="all" aria-pressed="true">전체</button>
+              <button type="button" data-mrange="1d" aria-pressed="false">어제</button>
+              <button type="button" data-mrange="7d" aria-pressed="false">일주일 전</button>
+              <button type="button" data-mrange="1m" aria-pressed="false">한달 전</button>
+              <button type="button" data-mrange="1y" aria-pressed="false">일년 전</button>
+            </div>
+          </div>
+        </div>
         <div class="table-wrap" style="margin-top:16px">
           <table class="grid"><thead id="moveHead"></thead><tbody id="moveRows"></tbody></table>
         </div>
@@ -690,7 +719,8 @@ const state = {
   reqType: '재고 요청', reqFilter: 'all', openReqs: new Set(),
   me: { team: '', name: '' },
   upKind: 'in', pendingKind: 'in',
-  sort: { home: { key: 'name', dir: 'asc' }, list: { key: 'name', dir: 'asc' }, moves: { key: 'at', dir: 'desc' },
+  listKind: 'in', moveRange: 'all',
+  sort: { home: { key: 'name', dir: 'asc' }, list: { key: 'name', dir: 'asc' }, outs: { key: 'at', dir: 'desc' }, moves: { key: 'at', dir: 'desc' },
           short: { key: 'judge', dir: 'asc' }, diff: { key: 'name', dir: 'asc' }, blocked: { key: 'name', dir: 'asc' },
           dtotal: { key: 'total', dir: 'desc' }, dusable: { key: 'usable', dir: 'desc' } },
   reqPopOpen: false,
@@ -723,7 +753,7 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 4000);
 }
 function setBusy(id, msg) { const el = $(id); el.textContent = msg || ''; el.hidden = !msg; state.busy = !!msg; syncButtons(); }
-function syncButtons() { $$('#itemSave,#importSave,#reclassifyAll,#outSave,#reqSend').forEach(b => { b.disabled = state.busy || !state.canWrite; }); }
+function syncButtons() { $$('#itemSave,#importSave,#outSave,#reqSend').forEach(b => { b.disabled = state.busy || !state.canWrite; }); }
 function cleanItem(o) { const r = {}; for (const k of FIELDS) r[k] = o[k] === undefined || o[k] === '' ? null : o[k]; return r; }
 function ago(ms) {
   if (!ms) return '';
@@ -742,7 +772,7 @@ const clock = ms => { const d = new Date(ms), p = n => String(n).padStart(2, '0'
 /* 서버에서 새 데이터를 받거나 새로고침한 시각 */
 function synced() { state.lastSync = Date.now(); }
 function whoAmI() {
-  const team = $('#rTeam').value.trim() || state.me.team || '';
+  const team = $('#iTeam').value.trim() || $('#rTeam').value.trim() || state.me.team || '';
   const name = $('#iWorker').value.trim() || $('#rName').value.trim() || state.me.name || '';
   if (team !== state.me.team || name !== state.me.name) { state.me = { team, name }; local.write(KEY_ME, state.me); }
   return { team: team || '이름 없는 팀', name };
@@ -854,7 +884,7 @@ const removeItem = id => dbRemove('items', id);
 function logMove(type, o = {}) {
   const me = whoAmI();
   return dbAdd('moves', [{ type, key: o.key ?? null, name: o.name ?? null, spec: o.spec ?? null, qty: o.qty ?? null, unit: o.unit ?? null,
-    date: o.date ?? null, detail: o.detail ?? null, team: me.team, by: me.name || null, at: Date.now() }]);
+    date: o.date ?? null, detail: o.detail ?? null, where: o.where ?? null, memo: o.memo ?? null, team: me.team, by: me.name || null, at: Date.now() }]);
 }
 async function saveSettings(s) {
   if (!guardWrite()) return false;
@@ -1130,10 +1160,12 @@ function renderLists() {
 
 /* ───────── 화면: 홈 ───────── */
 const qualityRank = p => (p.bad || p.expired) ? 0 : p.hold ? 1 : 2;
+/* 품질 상태별 수량(묶음 수가 아니라 개수)을 보여 준다. 예: 정상 96포대 · 불량 12포대 */
 function qualityPills(p) {
   const c = { ok: 0, hold: 0, bad: 0, expired: 0 };
-  p.lots.forEach(it => { c[lotState(it)]++; });
-  return `<div class="pills">${c.ok ? `<span class="status s-ok">정상 ${c.ok}</span>` : ''}${c.hold ? `<span class="status s-hold">보류 ${c.hold}</span>` : ''}${c.bad ? `<span class="status s-bad">불량 ${c.bad}</span>` : ''}${c.expired ? `<span class="status s-bad">만료 ${c.expired}</span>` : ''}</div>`;
+  p.lots.forEach(it => { c[lotState(it)] += Number(it.qty) || 0; });
+  const pill = (k, cls, label) => c[k] > 0 ? `<span class="status ${cls}">${label} ${fmtQ(c[k], p.unit)}</span>` : '';
+  return `<div class="pills">${pill('ok', 's-ok', '정상')}${pill('hold', 's-hold', '보류')}${pill('bad', 's-bad', '불량')}${pill('expired', 's-bad', '만료')}</div>`;
 }
 function judgeCell(p) {
   const u = p.unit;
@@ -1260,8 +1292,7 @@ function renderDetail(a, shown) {
     table = rows.length ? tableHtml('short', SHORT_COLS, rows) : `<div class="empty">지금 기준으로 부족한 품목이 없어요.</div>`;
   } else if (state.detail === 'diff') {
     const rows = shown.filter(p => p.hasErp && Math.abs(p.useGap) > 1e-6);
-    head = `<div class="table-head"><h3 class="sec-title">전산재고와 차이 나는 품목</h3>${close}</div>
-      <p class="note">'사용 불가 재고 포함'은 전산과 실물은 맞지만 보류·불량·만료분 때문에 쓸 수 있는 양이 적은 경우예요. '실물 수량 불일치'는 창고 실물과 전산 숫자 자체가 달라 실사가 필요한 경우예요.</p>`;
+    head = `<div class="table-head"><h3 class="sec-title">전산재고와 차이 나는 품목</h3>${close}</div>`;
     table = rows.length ? tableHtml('diff', DIFF_COLS, rows) : `<div class="empty">차이 나는 품목이 없어요.</div>`;
   } else {
     const keys = new Set(shown.map(p => p.key));
@@ -1492,11 +1523,13 @@ function ticketHtml(r, ctx) {
   const acts = r.status === 'new'
     ? `<button class="btn sm primary" data-req-act="doing" data-id="${id}">접수하기</button><button class="btn sm" data-req-act="rejected" data-id="${id}">반려</button>`
     : r.status === 'doing'
-    ? `${stock ? `<button class="btn sm primary" data-req-out="${id}">출고 처리</button>` : ''}<button class="btn sm${stock ? '' : ' primary'}" data-req-act="done" data-id="${id}">완료</button><button class="btn sm" data-req-act="new" data-id="${id}">대기로</button>`
+    // 재고 요청은 출고하면 자동으로 완료된다. 출고가 없는 불편사항·기타만 '완료' 버튼을 둔다
+    ? (stock ? `<button class="btn sm primary" data-req-out="${id}">출고 처리</button>` : `<button class="btn sm primary" data-req-act="done" data-id="${id}">완료</button>`)
     : `<button class="btn sm" data-req-act="new" data-id="${id}">다시 열기</button>`;
-  return `<article class="ticket${late ? ' late' : ''}${r.status === 'done' || r.status === 'rejected' ? ' closed' : ''}">
+  const closed = r.status === 'done' || r.status === 'rejected';
+  return `<article class="ticket${late ? ' late' : ''}${closed ? ' closed' : ''}">
     <div class="t-head"><span class="t-team">${esc(r.team)}</span>${r.name ? `<span class="t-who">${esc(r.name)}</span>` : ''}<span class="t-type ${typeCls}">${esc(r.type)}</span>
-      ${r.status === 'rejected' ? '<span class="status s-bad">반려</span>' : ''}<span class="t-time" title="${esc(stamp(r.createdAt))}">${esc(ago(r.createdAt))}</span></div>
+      ${r.status === 'rejected' ? '<span class="status s-bad">반려</span>' : ''}<span class="t-time" title="${esc(stamp(r.createdAt))}">${esc(ago(r.createdAt))}</span>${closed ? `<button class="t-del" type="button" data-req-del="${id}" title="이 요청과 대화 삭제" aria-label="${esc(r.team)} 요청 삭제">×</button>` : ''}</div>
     ${late ? `<span class="t-late">${LATE_MIN}분 넘게 대기 중</span>` : ''}
     ${r.item ? `<p class="t-item"><b>${esc(r.item)}</b>${isNum(r.qty) ? ` ${fmtQ(r.qty, unit)}` : ''}${avail}</p>` : ''}
     <p class="t-text">${esc(r.text)}</p>
@@ -1534,6 +1567,7 @@ function renderBoard() {
     if (el.innerHTML !== html) el.innerHTML = html;   // 바뀐 칸만 다시 그린다
     $('#c' + k).textContent = k === 'Done' ? list.filter(r => r.status === 'done' || r.status === 'rejected').length : lanes[k].length;
   }
+  $('#doneClear').hidden = !lanes.Done.length || !state.canWrite;
   $$('[data-thread]').forEach(el => { const s = scroll[el.dataset.thread]; el.scrollTop = s === undefined || s === 'bottom' ? el.scrollHeight : s; });
   $$('form[data-reply]').forEach(f => {
     const id = f.dataset.reply;
@@ -1584,19 +1618,62 @@ const MOVE_COLS = [
   { key: 'detail', label: '내용', cell: m => `<span style="white-space:normal;display:block;min-width:220px">${esc(m.detail || '')}</span>` },
   { key: 'team', label: '팀 · 이름', cell: m => `${esc(m.team || '-')}${m.by ? ' · ' + esc(m.by) : ''}` },
 ];
+/* 출고분 목록: 입출고 기록 중 '출고'만. 예전 기록은 사용처를 내용에서 꺼내 쓴다 */
+const outWhere = m => m.where || ((String(m.detail || '').match(/사용처 ([^·]+)/) || [])[1] || '').trim() || null;
+const OUT_COLS = [
+  { key: '_no', label: '#', sort: false, no: true },
+  { key: 'date', label: '출고일', get: m => m.date || todayISO(new Date(m.at || 0)), cell: m => esc(m.date || todayISO(new Date(m.at || 0))) },
+  { key: 'name', label: '품목명', cell: m => `${esc(m.name || '-')}${m.spec ? `<span class="sub-cell">${esc(m.spec)}</span>` : ''}` },
+  { key: 'qty', label: '출고 수량', num: true, get: m => isNum(m.qty) ? Number(m.qty) : null, cell: m => isNum(m.qty) ? `<b>${fmtQ(m.qty, m.unit || '')}</b>` : '-' },
+  { key: 'where', label: '사용처', get: outWhere, cell: m => esc(outWhere(m) || '-') },
+  { key: 'detail', label: '내용', sort: false, cell: m => `<span style="white-space:normal;display:block;min-width:220px">${esc(m.detail || '')}</span>` },
+  { key: 'team', label: '처리한 사람', cell: m => `${esc(m.team || '-')}${m.by ? ' · ' + esc(m.by) : ''}` },
+  { key: 'at', label: '처리 시각', cell: m => esc(stamp(m.at)) },
+];
+/* 입출고 기록 기간: 날짜를 고르면 그날만, 빠른 버튼은 그날부터 오늘까지 (어제는 어제 하루) */
+function moveRange() {
+  const day = $('#moveDate').value;
+  if (day) return { from: day, to: day, text: `${day} 하루 기록` };
+  const back = n => { const d = new Date(); d.setDate(d.getDate() - n); return todayISO(d); };
+  const backM = n => { const d = new Date(); d.setMonth(d.getMonth() - n); return todayISO(d); };
+  const today = todayISO();
+  switch (state.moveRange) {
+    case '1d': { const y = back(1); return { from: y, to: y, text: `어제(${y}) 기록` }; }
+    case '7d': return { from: back(7), to: today, text: `일주일 전(${back(7)})부터 오늘까지 기록` };
+    case '1m': return { from: backM(1), to: today, text: `한달 전(${backM(1)})부터 오늘까지 기록` };
+    case '1y': return { from: backM(12), to: today, text: `일년 전(${backM(12)})부터 오늘까지 기록` };
+    default: return null;
+  }
+}
 function renderList() {
   const q = state.search.trim().toLowerCase();
-  const items = state.items.filter(it => !q || `${it.name} ${it.supplier || ''} ${it.code || ''}`.toLowerCase().includes(q));
-  rebuildCodeMap();
-  const prodCount = new Set(items.map(keyOf)).size;
-  $('#listCount').textContent = `입고분 ${items.length}건${q ? ` (전체 ${state.items.length}건)` : ''} · 같은 품목끼리 묶으면 ${prodCount}개 품목 · 한 줄이 한 번 입고된 묶음이에요`;
-  $('#listHead').innerHTML = headHtml('list', LIST_COLS);
-  $('#listRows').innerHTML = items.length ? bodyHtml('list', LIST_COLS, items)
-    : `<tr><td colspan="${LIST_COLS.length}"><div class="empty">${state.items.length ? '검색 결과가 없어요.' : '아직 등록된 재고가 없어요.'}</div></td></tr>`;
+  const isOut = state.listKind === 'out';
+  $$('[data-listkind]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.listkind === state.listKind)));
+  $('#listTitle').textContent = isOut ? '출고분 전체 목록' : '입고분 전체 목록';
+  $('#listSearch').placeholder = isOut ? '품목명·사용처·팀 검색' : '품목명·코드·납품회사 검색';
+  if (isOut) {
+    closeEdit();
+    const all = state.moves.filter(m => m.type === '출고');
+    const outs = all.filter(m => !q || `${m.name || ''} ${m.spec || ''} ${outWhere(m) || ''} ${m.team || ''} ${m.by || ''}`.toLowerCase().includes(q));
+    $('#listHead').innerHTML = headHtml('outs', OUT_COLS);
+    $('#listRows').innerHTML = outs.length ? bodyHtml('outs', OUT_COLS, outs)
+      : `<tr><td colspan="${OUT_COLS.length}"><div class="empty">${all.length ? '검색 결과가 없어요.' : '아직 출고 기록이 없어요.'}</div></td></tr>`;
+  } else {
+    const items = state.items.filter(it => !q || `${it.name} ${it.supplier || ''} ${it.code || ''}`.toLowerCase().includes(q));
+    rebuildCodeMap();
+    $('#listHead').innerHTML = headHtml('list', LIST_COLS);
+    $('#listRows').innerHTML = items.length ? bodyHtml('list', LIST_COLS, items)
+      : `<tr><td colspan="${LIST_COLS.length}"><div class="empty">${state.items.length ? '검색 결과가 없어요.' : '아직 등록된 재고가 없어요.'}</div></td></tr>`;
+  }
+
+  const range = moveRange();
+  $$('[data-mrange]').forEach(b => b.setAttribute('aria-pressed', String(!$('#moveDate').value && b.dataset.mrange === state.moveRange)));
+  $('#moveRange').textContent = range ? `${range.text}을 보여 줘요.` : '누가 언제 입고·출고·수정·삭제했는지 최근 기록을 보여 줘요.';
   $('#moveHead').innerHTML = headHtml('moves', MOVE_COLS);
-  const moves = [...state.moves].sort((x, y) => (y.at || 0) - (x.at || 0)).slice(0, 300);
+  const moves = state.moves.filter(m => { if (!range) return true; const d = todayISO(new Date(m.at || 0)); return d >= range.from && d <= range.to; })
+    .sort((x, y) => (y.at || 0) - (x.at || 0)).slice(0, 300);
   $('#moveRows').innerHTML = moves.length ? bodyHtml('moves', MOVE_COLS, moves)
-    : `<tr><td colspan="${MOVE_COLS.length}"><div class="empty">아직 기록이 없어요. 입고·출고·수정·삭제를 하면 여기에 남아요.</div></td></tr>`;
+    : `<tr><td colspan="${MOVE_COLS.length}"><div class="empty">${range ? '이 기간에는 기록이 없어요.' : '아직 기록이 없어요. 입고·출고·수정·삭제를 하면 여기에 남아요.'}</div></td></tr>`;
 }
 function openEdit(id) {
   const it = state.items.find(i => i.id === id);
@@ -1678,7 +1755,7 @@ async function doOut(key, qty, opt) {
     left -= take;
   }
   const first = lots[0];
-  await logMove('출고', { key, name: first.name, spec: first.spec, qty, unit, date: opt.date || todayISO(),
+  await logMove('출고', { key, name: first.name, spec: first.spec, qty, unit, date: opt.date || todayISO(), where: opt.where || null, memo: opt.memo || null,
     detail: [opt.where && `사용처 ${opt.where}`, used.join(', '), opt.memo, opt.erp ? '전산재고 함께 차감' : '전산재고 그대로'].filter(Boolean).join(' · ') });
   return true;
 }
@@ -1689,6 +1766,14 @@ async function setReqStatus(id, status, extra) {
   const me = whoAmI();
   if (!await dbUpdate('requests', id, { status, updatedAt: Date.now() })) return false;
   await dbAdd('chats', [{ reqId: id, system: true, text: `${me.team}${me.name ? ' ' + me.name : ''}이(가) ${extra || STATUS_TEXT[status]}`, at: Date.now() }]);
+  return true;
+}
+
+/* 완료된 요청 삭제: 요청에 달린 대화도 함께 지운다 */
+async function removeRequest(id) {
+  for (const c of state.chats.filter(c => c.reqId === id)) if (!await dbRemove('chats', c.id)) return false;
+  if (!await dbRemove('requests', id)) return false;
+  state.openReqs.delete(id);
   return true;
 }
 
@@ -1841,11 +1926,14 @@ function bind() {
   $('#fSizeUnit').innerHTML = opt(SIZE_UNITS, '단위');
   $('#iQtyUnit').innerHTML = opt(QTY_UNITS); $('#eQtyUnit').innerHTML = opt(QTY_UNITS);
   $('#iDate').value = todayISO(); $('#oDate').value = todayISO();
-  $('#rTeam').value = state.me.team; $('#rName').value = state.me.name; $('#iWorker').value = state.me.name;
-  // 작업자 이름과 채팅 이름은 같은 사람이므로 서로 맞춰 둔다
+  $('#rTeam').value = state.me.team; $('#rName').value = state.me.name; $('#iWorker').value = state.me.name; $('#iTeam').value = state.me.team;
+  // 작업자 이름·소속 팀과 채팅의 이름·보내는 팀은 같은 사람이므로 서로 맞춰 둔다
   $('#iWorker').addEventListener('input', e => { $('#rName').value = e.target.value; });
   $('#rName').addEventListener('input', e => { $('#iWorker').value = e.target.value; });
+  $('#iTeam').addEventListener('input', e => { $('#rTeam').value = e.target.value; });
+  $('#rTeam').addEventListener('input', e => { $('#iTeam').value = e.target.value; });
   $('#iWorker').addEventListener('change', () => whoAmI());
+  $('#iTeam').addEventListener('change', () => whoAmI());
   const needWorker = () => {
     if ($('#iWorker').value.trim()) return true;
     toast('작업자 이름을 먼저 입력해 주세요.'); $('#iWorker').focus(); return false;
@@ -1948,7 +2036,7 @@ function bind() {
 
   /* 공통 클릭 */
   document.addEventListener('click', async e => {
-    const t = e.target.closest('[data-sort],[data-expand],[data-detail],[data-action],[data-go],[data-del],[data-edit],[data-mode],[data-type],[data-f],[data-req-act],[data-req-out],[data-req-toggle],[data-sup-del]');
+    const t = e.target.closest('[data-sort],[data-expand],[data-detail],[data-action],[data-go],[data-del],[data-edit],[data-mode],[data-type],[data-f],[data-req-act],[data-req-out],[data-req-toggle],[data-sup-del],[data-req-del],[data-req-clear],[data-listkind],[data-mrange]');
     if (!t) return;
     const d = t.dataset;
     if (d.sort) {
@@ -1973,6 +2061,25 @@ function bind() {
     else if (d.f) { state.reqFilter = d.f; renderBoard(); }
     else if (d.edit) openEdit(d.edit);
     else if (d.reqToggle) { state.openReqs.has(d.reqToggle) ? state.openReqs.delete(d.reqToggle) : state.openReqs.add(d.reqToggle); renderBoard(); }
+    // 삭제는 실수로 누르지 않게 한 번 더 눌러야 한다 (3초 안에)
+    else if (d.reqDel || d.reqClear) {
+      if (!guardWrite()) return;
+      if (!d.armed) {
+        const label = t.textContent;
+        d.armed = '1'; t.textContent = d.reqDel ? '삭제 확인' : '한 번 더 누르면 모두 삭제';
+        setTimeout(() => { if (t.isConnected) { delete t.dataset.armed; t.textContent = label; } }, 3000);
+        return;
+      }
+      t.disabled = true;
+      const ids = d.reqDel ? [d.reqDel]
+        : state.requests.filter(r => (r.status === 'done' || r.status === 'rejected') && (state.reqFilter === 'all' || r.type === state.reqFilter)).map(r => r.id);
+      let n = 0;
+      for (const id of ids) { if (!await removeRequest(id)) break; n++; }
+      if (n) toast(d.reqDel ? '완료된 요청을 삭제했어요.' : `완료된 요청 ${n}건을 삭제했어요.`);
+      if (t.isConnected) { t.disabled = false; delete t.dataset.armed; t.textContent = d.reqDel ? '×' : '전체 삭제'; }
+    }
+    else if (d.listkind) { state.listKind = d.listkind; renderList(); }
+    else if (d.mrange) { state.moveRange = d.mrange; $('#moveDate').value = ''; renderList(); }
     else if (d.reqAct) { t.disabled = true; if (await setReqStatus(d.id, d.reqAct)) toast(`요청을 ${STATUS_TEXT[d.reqAct]}.`); t.disabled = false; }
     else if (d.reqOut) {
       const r = state.requests.find(x => x.id === d.reqOut); if (!r) return;
@@ -2109,22 +2216,7 @@ function bind() {
       closeEdit(); toast('수정했어요.');
     }
   });
-  $('#reclassifyAll').addEventListener('click', async () => {
-    if (state.busy || !guardWrite() || !state.items.length) return;
-    const items = state.items.filter(i => !i.example);
-    if (!items.length) { toast('다시 분류할 실제 재고가 없어요. 예시 데이터는 분류를 바꾸지 않아요.'); return; }
-    setBusy('#listBusy', state.sample ? `AI가 ${items.length}건을 다시 분류하고 있어요… (사람이 적은 자재 분류·기후/환경 조건은 그대로 둬요)` : '기본 규칙으로 다시 분류하고 있어요…');
-    try {
-      const r = await classifyRows(items, true);
-      for (let i = 0; i < items.length; i++) {
-        const a = items[i], b = r.rows[i];
-        if (a.category !== b.category || a.climate !== b.climate || a.reason !== b.reason || a.classifiedBy !== b.classifiedBy) {
-          if (!await updateItem(a.id, { category: b.category, climate: b.climate, reason: b.reason, classifiedBy: b.classifiedBy })) break;
-        }
-      }
-      toast(r.via ? `${items.length}건을 ${r.via} 분류로 다시 정리했어요.` : '모두 사람이 적은 값이라 바꿀 게 없어요.');
-    } finally { setBusy('#listBusy', ''); }
-  });
+  $('#moveDate').addEventListener('change', renderList);
 
   /* 설정 */
   $('#settingsForm').addEventListener('submit', async e => {
